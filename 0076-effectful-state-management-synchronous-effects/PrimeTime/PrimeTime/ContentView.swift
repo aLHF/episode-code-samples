@@ -71,19 +71,17 @@ extension AppState {
   }
 }
 
-let appReducer: (inout AppState, AppAction) -> Void = combine(
+let appReducer: (inout AppState, AppAction) -> Effect<AppState> = combine(
   pullback(counterViewReducer, value: \.counterView, action: \.counterView),
   pullback(favoritePrimesReducer, value: \.favoritePrimes, action: \.favoritePrimes)
 )
 
 func activityFeed(
-  _ reducer: @escaping (inout AppState, AppAction) -> Void
-) -> (inout AppState, AppAction) -> Void {
-
+  _ reducer: @escaping Reducer<AppState, AppAction>
+) -> Reducer<AppState, AppAction> {
   return { state, action in
     switch action {
-    case .counterView(.counter),
-         .favoritePrimes(.loadedFavoritePrimes):
+    case .counterView(.counter), .favoritePrimes(.loadFavoritePrimes), .favoritePrimes(.saveButtonTapped):
       break
     case .counterView(.primeModal(.removeFavoritePrimeTapped)):
       state.activityFeed.append(.init(timestamp: Date(), type: .removedFavoritePrime(state.count)))
@@ -97,7 +95,7 @@ func activityFeed(
       }
     }
 
-    reducer(&state, action)
+    return reducer(&state, action)
   }
 }
 

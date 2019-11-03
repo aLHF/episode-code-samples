@@ -18,7 +18,7 @@ public func counterReducer(state: inout Int, action: CounterAction) {
 }
 
 public let counterViewReducer = combine(
-  pullback(counterReducer, value: \CounterViewState.count, action: \CounterViewAction.counter),
+  pullback(pure(counterReducer), value: \CounterViewState.count, action: \CounterViewAction.counter),
   pullback(primeModalReducer, value: \.self, action: \.primeModal)
 )
 

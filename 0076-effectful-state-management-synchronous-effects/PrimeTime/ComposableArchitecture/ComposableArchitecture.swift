@@ -1,9 +1,9 @@
 import Combine
 import SwiftUI
 
-public typealias Effect = () -> Void
+public typealias Effect<Value> = (inout Value) -> Void
 
-public typealias Reducer<Value, Action> = (inout Value, Action) -> Effect
+public typealias Reducer<Value, Action> = (inout Value, Action) -> Effect<Value>
 
 //Button.init("Save", action: <#() -> Void#>)
 
@@ -19,7 +19,7 @@ public final class Store<Value, Action>: ObservableObject {
 
   public func send(_ action: Action) {
     let effect = self.reducer(&self.value, action)
-    effect()
+    effect(&value)
   }
 
   public func view<LocalValue, LocalAction>(
@@ -31,7 +31,7 @@ public final class Store<Value, Action>: ObservableObject {
       reducer: { localValue, localAction in
         self.send(toGlobalAction(localAction))
         localValue = toLocalValue(self.value)
-        return {}
+        return { _ in }
     }
     )
     localStore.cancellable = self.$value.sink { [weak localStore] newValue in
@@ -46,9 +46,9 @@ public func combine<Value, Action>(
 ) -> Reducer<Value, Action> {
   return { value, action in
     let effects = reducers.map { $0(&value, action) }
-    return {
+    return { someValue in
       for effect in effects {
-        effect()
+        effect(&someValue)
       }
     }
   }
@@ -60,24 +60,38 @@ public func pullback<LocalValue, GlobalValue, LocalAction, GlobalAction>(
   action: WritableKeyPath<GlobalAction, LocalAction?>
 ) -> Reducer<GlobalValue, GlobalAction> {
   return { globalValue, globalAction in
-    guard let localAction = globalAction[keyPath: action] else { return {} }
+    guard let localAction = globalAction[keyPath: action] else { return { _ in } }
     let effect = reducer(&globalValue[keyPath: value], localAction)
-    return effect
-  }
-}
-
-public func logging<Value, Action>(
-  _ reducer: @escaping Reducer<Value, Action>
-) -> Reducer<Value, Action> {
-  return { value, action in
-    let effect = reducer(&value, action)
-    let newValue = value
-    return {
-      print("Action: \(action)")
-      print("Value:")
-      dump(newValue)
-      print("---")
-      effect()
+    return { globalVal in
+      var localVal = globalVal[keyPath: value]
+      effect(&localVal)
+      globalVal[keyPath: value] = localVal
     }
   }
 }
+
+public func pure<State, Action>(
+  _ reducer: @escaping (inout State, Action) -> Void
+) -> Reducer<State, Action> {
+  return { state, action in
+    reducer(&state, action)
+    return { _ in }
+  }
+}
+
+//public func logging<Value, Action>(
+//  _ reducer: @escaping Reducer<Value, Action>
+//) -> Reducer<Value, Action> {
+//  return { value, action in
+//    let effect = reducer(&value, action)
+//    #warning("newValue is a var and is passed to an escaping closure. It can be mutated unexpectedly")
+//    var newValue = value
+//    return { _ in
+//      print("Action: \(action)")
+//      print("Value:")
+//      dump(newValue)
+//      print("---")
+//      effect(&newValue)
+//    }
+//  }
+//}

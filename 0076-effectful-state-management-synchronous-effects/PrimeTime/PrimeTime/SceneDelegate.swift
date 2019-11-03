@@ -14,10 +14,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             initialValue: AppState(),
             reducer: with(
               appReducer,
-              compose(
-                logging,
-                activityFeed
-              )
+              activityFeed
             )
           )
         )

@@ -12,7 +12,7 @@ PlaygroundPage.current.liveView = UIHostingController(
         favoritePrimes: [],
         isNthPrimeButtonDisabled: false
       ),
-      reducer: logging(counterViewReducer)
+      reducer: counterViewReducer
     )
   )
 )
