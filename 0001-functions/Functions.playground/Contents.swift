@@ -1,28 +1,26 @@
+func toString(_ int: Int) -> String {
+  return "\(int)"
+}
 
 func incr(_ x: Int) -> Int {
   return x + 1
 }
 
-incr(2)
-
-func square(_ x: Int) -> Int {
-  return x * x
-}
-
-square(incr(2))
+incr(5)
+toString(5)
 
 extension Int {
   func incr() -> Int {
     return self + 1
   }
 
-  func square() -> Int {
-    return self * self
+  func toString() -> String {
+    return "\(self)"
   }
 }
 
-2.incr()
-2.incr().square()
+5.incr().incr()
+5.incr().toString()
 
 precedencegroup ForwardApplication {
   associativity: left
@@ -30,33 +28,31 @@ precedencegroup ForwardApplication {
 
 infix operator |>: ForwardApplication
 
-func |> <A, B>(x: A, f: (A) -> B) -> B {
-  return f(x)
+func |> <A, B>(a: A, f: (A) -> B) -> B {
+  return f(a)
 }
 
-2 |> incr |> square
-
-extension Int {
-  func incrAndSquare() -> Int {
-    return self.incr().square()
-  }
-}
+2 |> incr |> toString
 
 precedencegroup ForwardComposition {
   higherThan: ForwardApplication
   associativity: right
 }
+
 infix operator >>>: ForwardComposition
 
-func >>> <A, B, C>(_ f: @escaping (A) -> B, _ g: @escaping (B) -> C) -> ((A) -> C) {
-  return { a in g(f(a)) }
+func >>> <A, B, C>(f: @escaping (A) -> B, g: @escaping (B) -> C) -> (A) -> C {
+  return { a in
+    return g(f(a))
+  }
 }
 
-2 |> incr >>> square
+2 |> incr >>> incr >>> toString
 
-[1, 2, 3]
-  .map(square)
+[1, 2, 3, 4, 5] // Traverse array 3 times
   .map(incr)
+  .map(incr)
+  .map(toString)
 
-[1, 2, 3]
-  .map(square >>> incr)
+[1, 2, 3, 4, 5] // Traverse once
+  .map(incr >>> incr >>> String.init)

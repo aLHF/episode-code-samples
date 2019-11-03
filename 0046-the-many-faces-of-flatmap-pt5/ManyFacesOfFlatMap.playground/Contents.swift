@@ -354,7 +354,7 @@ zip(with: UserEnvelope.init)(
     .flatMap { url in Parallel(try! Data.init(contentsOf: url)) }
     .flatMap { data in Parallel(try! JSONDecoder().decode([Invoice].self, from: data)) }
   ).run { env in
-//    print(env)
+    //    print(env)
 }
 
 //
@@ -552,9 +552,9 @@ func zip<A, B, E>(
 
   return zip(with: zip)(lhs, rhs)
 
-//  return zip(lhs, rhs).map { resultA, resultB in
-//    zip(resultA, resultB)
-//  }
+  //  return zip(lhs, rhs).map { resultA, resultB in
+  //    zip(resultA, resultB)
+  //  }
 }
 
 func flatMap<A, B, E>(
@@ -578,7 +578,10 @@ func flatMap<A, B, E>(
 
 extension Optional {
   func newMap<NewWrapped>(_ f: (Wrapped) -> NewWrapped) -> NewWrapped? {
-    return self.flatMap { Optional<NewWrapped>.some(f($0)) }
+    let see1 = self.flatMap(f)
+    let see2 = self.flatMap { Optional<NewWrapped>.some(f($0)) }
+
+    return self.flatMap(f)
   }
 }
 
@@ -613,19 +616,11 @@ extension Parallel {
 }
 
 func newZip<A, B>(_ a: A?, _ b: B?) -> (A, B)? {
-  return a.flatMap { a in
-    b.flatMap { b in
-      Optional.some((a, b))
-    }
-  }
+  return a.flatMap { a in b.flatMap { b in Optional.some((a, b)) } }
 }
 
 func newZip<A, B>(_ a: [A], _ b: [B]) -> [(A, B)] {
-  return a.flatMap { a in
-    b.flatMap { b in
-      [(a, b)]
-    }
-  }
+  return a.flatMap { a in b.flatMap { b in [(a, b)] } } // it's a combine function. Not a zip
 }
 
 newZip(["a", "b"], [1, 2])
@@ -676,7 +671,121 @@ newZip(delay(by: 2).map { 2 }, delay(by: 3).map { 3 }).run {
   print($0)
 }
 
+/*:
+ 1.Implement flatMap on the nested type Result<A?, E>.
+ */
+
+func flatMap<A, B, E>(_ f: @escaping (A) -> Result<B?, E>) -> (Result<A?, E>) -> Result<B?, E> {
+  return { resultOptionalA in
+    //    resultOptionalA.flatMap { optionalA -> Result<B?, E> in
+    //      switch optionalA {
+    //      case .some(let a):
+    //        return f(a)
+    //
+    //      case .none:
+    //        return .success(.none)
+    //      }
+    //    }
+
+    switch resultOptionalA {
+    case let .success(.some(value)):
+      return f(value)
+
+    case .success(.none):
+      return .success(.none)
+
+    case .failure(let error):
+      return .failure(error)
+    }
+  }
+}
+
+/*:
+ 2. Implement flatMap on the nested type Func<A, B?>.
+ */
+
+func flatMap<A, B, C>(_ f: @escaping (B) -> Func<A, C?>) -> (Func<A, B?>) -> Func<A, C?> {
+  return { funcAB in
+    funcAB.flatMap { optionalB in
+      switch optionalB {
+      case .some(let b):
+        return f(b)
+
+      case .none:
+        return Func { _ in nil }
+      }
+    }
+
+    //    return Func<A, C?> { a in
+    //      switch funcAB.run(a) {
+    //      case .some(let b):
+    //        return f(b).run(a)
+    //
+    //      case .none:
+    //        return nil
+    //      }
+    //    }
+  }
+}
+
+/*
+ 3. Implement flatMap on the nested type Parallel<A?>.
+ */
+func flatMap<A, B>(_ f: @escaping (A) -> Parallel<B?>) -> (Parallel<A?>) -> Parallel<B?> {
+  return { parallelA in
+    return parallelA.flatMap { optionalA in
+      switch optionalA {
+      case .some(let a):
+        return f(a)
+
+      case .none:
+        return Parallel { callback in callback(nil) }
+      }
+    }
+
+    //    Parallel<B?>(run: { callback in
+    //      parallelA.run { optionalA in
+    //        switch optionalA {
+    //        case .some(let a):
+    //          f(a).run { callback($0) }
+    //
+    //        case .none:
+    //          callback(nil)
+    //        }
+    //      }
+    //    })
+  }
+}
 
 
+/*:
+ 4. Do you see anything in common with all of the implementations in the previous 3 exercises? It turns out that if a generic type F<A> has a flatMap operation, then you can define a flatMap on F<A?> in a natural way.
+ */
 
+/*:
+ 5. Implement flatMap on the nested type Func<A, Result<B, E>>
+ */
 
+func flatMap<A, B, C, E>(_ f: @escaping (B) -> Func<A, Result<C, E>>) -> (Func<A, Result<B, E>>) -> Func<A, Result<C, E>> {
+  return { funcAandResult in
+    return funcAandResult.flatMap { resultB in
+      switch resultB {
+      case .success(let b):
+        return f(b)
+
+      case .failure(let error):
+        return Func { _ in .failure(error) }
+      }
+    }
+
+//    Func<A, Result<C, E>> { a in
+//      switch funcAandResult.run(a) {
+//      case .success(let b):
+//        return f(b).run(a)
+//
+//      case .failure(let error):
+//        return .failure(error)
+//      }
+//    }
+  }
+}

@@ -5,6 +5,7 @@ struct User {
   var isAdmin: Bool
 }
 
+/*
 let user = User(name: "Blob", isAdmin: true)
 
 user.name
@@ -136,3 +137,43 @@ results
     guard case let .failure(error) = result else { return nil }
     return error
 }
+
+*/
+
+/*
+ 1.While we’ve defined the gets of our enum properties, we haven’t defined our sets. Redefine Validated’s valid and invalid properties to have a setter in addition to its getter.
+
+ 2. Take the valid setter for a spin. Assign Validated<Int, String>.valid(1) to a variable and increment the number using the setter.
+ */
+
+enum Result<Value, Error> {
+  case success(Value)
+  case failure(Error)
+
+  var value: Value? {
+    get {
+      guard case let .success(value) = self else { return nil }
+      return value
+    }
+
+    set {
+      guard let value = newValue else { return } // Maybe we can throw an error if the value is nil
+      self = .success(value)
+    }
+  }
+
+  var failure: Error? {
+    guard case let .failure(value) = self else { return nil }
+    return value
+  }
+}
+
+enum SomeError: Error {
+  case aaa
+  case bbb
+}
+
+var test: Result<Int, SomeError> = .success(1)
+test
+test.value = 2
+test

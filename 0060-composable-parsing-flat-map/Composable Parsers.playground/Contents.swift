@@ -192,3 +192,65 @@ let coord = double
 
 coord.run("40.6782° N, 73.9442° W")
 coord.run("40.6782° Z, 73.9442° W")
+
+/*
+ 1. Define zip and flatMap on the Parser type. Start by defining what their signatures should be, and then figure out how to implement them in the simplest way possible. What gotcha to be on the look out for is that you do not want to consume any of the input string if the parser fails.
+ */
+
+extension Parser {
+  func zip<B>(_ pa: Parser<A>, _ pb: Parser<B>) -> Parser<(A, B)> {
+    return Parser<(A, B)> { str in
+      let original = str
+
+      guard
+        let valueA = pa.run(&str),
+        let valueB = pb.run(&str)
+        else
+      {
+        str = original
+        return nil
+      }
+
+      return (valueA, valueB)
+    }
+  }
+}
+
+/*
+ 2. Use the zip function defined in the previous exercise to construct a Parser<Coordinate> for parsing strings of the form "40.446° N, 79.982° W". You may want to define zip overloads that work on more than 2 parsers at a time.
+ */
+
+func zip<A, B, C, D, E, F, G, H>(
+  _ pa: Parser<A>,
+  _ pb: Parser<B>,
+  _ pc: Parser<C>,
+  _ pd: Parser<D>,
+  _ pe: Parser<E>,
+  _ pf: Parser<F>,
+  _ pg: Parser<G>,
+  _ with: @escaping (A, B, C, D, E, F, G) -> H
+  ) -> Parser<H> {
+  return Parser<H> { str in
+    let original = str
+
+    guard
+      let valueA = pa.run(&str),
+      let valueB = pb.run(&str),
+      let valueC = pc.run(&str),
+      let valueD = pd.run(&str),
+      let valueE = pe.run(&str),
+      let valueF = pf.run(&str),
+      let valueG = pg.run(&str)
+      else
+    {
+      str = original
+      return nil
+    }
+
+    return with(valueA, valueB, valueC, valueD, valueE, valueF, valueG)
+  }
+}
+
+zip(double, literal("° "), northSouth, literal(", "), double, literal("° "), eastWest) { lat, _, latSign, _, long, _, longSign  in
+  return Coordinate(latitude: lat * latSign, longitude: long * longSign)
+}.run("40.446° N, 79.982° W")

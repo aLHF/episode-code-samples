@@ -202,3 +202,96 @@ password.run()
 password.run()
 password.run()
 password.run()
+
+/*:
+ 1. Create a function called frequency that takes an array of pairs, [(Int, Gen<A>)], to create a Gen<A> such that (2, gen) is twice as likely to be run than a (1, gen).
+ */
+func frequence<A>(_ pairs: [(Int, Gen<A>)]) -> Gen<A> {
+  let indexes = zip(pairs.indices, pairs.map { $0.0 }).flatMap { return Array(repeating: $0, count: $1) }
+
+  return .init {
+    let index = element(of: indexes).map { $0! }.run()
+    let generator = pairs[index].1
+    return generator.run()
+  }
+}
+
+let test1 = [(10, int(in: 0...9)), (1, int(in: 10...19)), (4, int(in: 20...29)), (7, int(in: 30...39))]
+frequence(test1).run()
+frequence(test1).run()
+frequence(test1).run()
+frequence(test1).run()
+frequence(test1).run()
+
+/*:
+ 2. Extend Gen with an optional computed property that returns a generator that returns nil a quarter of the time. What other generators can you compose this from?
+ */
+extension Gen {
+  var quater: Gen<A?> {
+    return self.map { result in
+      if int(in: 0...3).run() == 0 {
+        return nil
+      } else {
+        return result
+      }
+    }
+  }
+}
+
+/*:
+ 3. Extend Gen with a filter method that returns a generator that filters out random entries that don’t match the predicate. What kinds of problems may this function have?
+ */
+extension Gen {
+  func filter(_ isIncluded: @escaping (A) -> Bool) -> Gen<A?> {
+    return .init {
+      let value = self.run()
+      return isIncluded(value) ? value : nil
+    }
+  }
+}
+
+/*:
+ 4.Create a string generator of type Gen<String> that randomly produces a randomly-sized string of any unicode character. What smaller generators do you composed it from?
+ */
+let scalarCodeGenerator = Gen<Int> {
+  let generator = int(in: 0...1114111)
+  var scalarCodeValue = generator.run()
+
+  while 55295...57344 ~= scalarCodeValue {
+    scalarCodeValue = generator.run()
+  }
+
+  return scalarCodeValue
+}
+
+let stringCharacterGenerator = scalarCodeGenerator.map { UnicodeScalar($0)! }.map { String($0) }
+let lengthGenerator = int(in: 0...10)
+
+let randomStringGenerator = stringCharacterGenerator.array(count: lengthGenerator).map { $0.joined() }
+randomStringGenerator.run()
+print(randomStringGenerator.run())
+
+/*:
+ 5. Redefine element(of:) to work with any Collection. Can it also be redefined in terms of Sequence?
+ */
+func collectionElement<C: Collection>(_ collection: C) -> Gen<C.Element?> {
+  return int(in: 0...(collection.count - 1)).map { index in
+    print("index: \(index)")
+    return collection.dropFirst(index).first
+  }
+}
+
+let test5 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+let gen5 = collectionElement(test5)
+
+func sequenceElement<S: Sequence>(_ sequence: S) -> Gen<S.Element?> {
+  return int(in: 0...(sequence.underestimatedCount - 1)).map { index in
+    print("index: \(index)")
+    // iterate and get the element
+
+  }
+}
+
+/*:
+ 6. Create a subsequence generator to return a randomly-sized, randomly-offset subsequence of an array. Can it be redefined in terms of Collection
+ */

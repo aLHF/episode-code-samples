@@ -58,8 +58,7 @@ func zip2<A, B>(_ xs: [A], _ ys: [B]) -> [(A, B)] {
 zip2([1, 2, 3], ["one", "two", "three"])
 
 func zip3<A, B, C>(_ xs: [A], _ ys: [B], _ zs: [C]) -> [(A, B, C)] {
-  return zip2(xs, zip2(ys, zs)) // [(A, (B, C))]
-    .map { a, bc in (a, bc.0, bc.1) }
+  return zip2(xs, zip2(ys, zs)).map { a, bc in (a, bc.0, bc.1) }
 }
 
 zip3([1, 2, 3], ["one", "two", "three"], [true, false, true])
@@ -76,9 +75,9 @@ func zip2<A, B, C>(
 func zip3<A, B, C, D>(
   with f: @escaping (A, B, C) -> D
   ) -> ([A], [B], [C]) -> [D] {
-
   return { zip3($0, $1, $2).map(f) }
 }
+
 
 // map:         ((A)       -> B) -> ([A])           -> [B]
 // zip2(with:): ((A, B)    -> C) -> ([A], [B])      -> [C]
@@ -95,8 +94,7 @@ func zip2<A, B>(_ a: A?, _ b: B?) -> (A, B)? {
 }
 
 func zip3<A, B, C>(_ a: A?, _ b: B?, _ c: C?) -> (A, B, C)? {
-  return zip2(a, zip2(b, c))
-    .map { a, bc in (a, bc.0, bc.1) }
+  return zip2(a, zip2(b, c)).map { a, bc in (a, bc.0, bc.1) }
 }
 
 func zip2<A, B, C>(
@@ -126,7 +124,7 @@ zip2(with: +)(a, b)
 zip3(
   with: { $0 + $1 + $2 })(a, b, c)
 
-let d: Int?
+var d: Int? // should be let, but doesn't work in playground
 if let a = a, let b = b, let c = c {
   d = a + b + c
 } else {

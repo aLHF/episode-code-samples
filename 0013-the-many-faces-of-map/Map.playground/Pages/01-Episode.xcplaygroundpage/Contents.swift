@@ -4,67 +4,59 @@
 [1, 2, 3]
   .map(incr)
 
-func map<A, B>(_ f: @escaping (A) -> B) -> ([A]) -> [B] {
+func map<A, B>(_ transform: @escaping (A) -> B) -> ([A]) -> [B] {
   return { xs in
     var result = [B]()
-    xs.forEach { result.append(f($0)) }
+    result.reserveCapacity(xs.count)
+    xs.forEach { result.append(transform($0)) }
     return result
   }
 }
 
-[1, 2, 3]
-  |> map(incr)
-[1, 2, 3]
-  |> map(incr)
-  |> map(square)
-[1, 2, 3]
-  |> map(incr >>> square)
+[1, 2, 3] |> map(incr)
+[1, 2, 3] |> map(incr) |> map(square)
+[1, 2, 3] |> map(incr >>> square)
 
-Int?.some(2)
-  .map(incr)
-Int?.none
-  .map(incr)
+Int?.some(2).map(incr)
+Int?.none.map(incr)
 
-func map<A, B>(_ f: @escaping (A) -> B) -> (A?) -> B? {
-  return {
-    switch $0 {
-    case let .some(a):
-      return .some(f(a))
+func map<A, B>(_ transform: @escaping (A) -> B) -> (A?) -> B? {
+  return { value in
+    switch value {
+    case .some(let value):
+      return .some(transform(value))
+
     case .none:
       return .none
     }
   }
 }
 
-Int?.some(2)
-  |> map(incr)
-Int?.some(2)
-  |> map(incr)
-  |> map(square)
-Int?.some(2)
-  |> map(incr >>> square)
+Int?.none |> map(incr)
+Int?.some(2) |> map(incr)
+Int?.some(2) |> map(incr >>> square)
 
 [1, 2, 3]
   .map { $0 }
+
 Int?.some(2)
   .map { $0 }
 
-func id<A>(_ a: A) -> A {
+func identity<A>(_ a: A) -> A {
   return a
 }
 
 [1, 2, 3]
-  .map(id)
+  .map(identity)
+
 Int?.some(2)
-  .map(id)
+  .map(identity)
 
-[1, 2, 3, nil, 4].compactMap(id)
-[1, 2, 3, nil, 4].flatMap(id)
+[1, 2, nil, nil, 5, nil, 7].compactMap(identity)
 
-// map(id) == id
-
-[1, 2, 3].map(id) == id([1, 2, 3])
-Int?.some(2).map(id) == id(Int?.some(2))
+// map(identity) = identity
+[1, 2, 3].map(identity) == identity([1, 2, 3])
+Int?.some(2).map(identity) == identity(Int?.some(2))
 
 // f >>> id = f
 // id >>> f = f
@@ -75,10 +67,10 @@ func lift<A, B>(_ f: @escaping (A) -> B) -> ([A]) -> [B] {
 //    return (xs + xs).map(f)
 //    return (xs + xs + xs).map(f)
 //    return xs.reversed().map(f)
-    return Array(xs.prefix(1)).map(f)
-    return Array(xs.prefix(2)).map(f)
-    return Array(xs.suffix(1)).map(f)
-    return Array(xs.suffix(2)).map(f)
+//    return Array(xs.prefix(1)).map(f)
+//    return Array(xs.prefix(2)).map(f)
+//    return Array(xs.suffix(1)).map(f)
+//    return Array(xs.suffix(2)).map(f)
 
     return (xs.map(f) + xs.map(f))
     return (xs.map(f) + xs.map(f) + xs.map(f))
@@ -90,7 +82,7 @@ func lift<A, B>(_ f: @escaping (A) -> B) -> ([A]) -> [B] {
   }
 }
 
-// if f, g are functions
+// if f,g are functions
 // lift(f) >>> map(g) == map(f) >>> lift(g)
 
 let xs = [1, 2, 3, 4]
@@ -99,34 +91,31 @@ let g = { (x: Int) in String(x) }
 
 let lhs = lift(f) >>> map(g)
 let rhs = map(f) >>> lift(g)
-
 lhs(xs)
 rhs(xs)
 lhs(xs) == rhs(xs)
 
-// Suppose lift(id) = id
-// If f = id, g is any function
-// lift(id) >>> map(g) == map(id) >>> lift(g)
-// id >>> map(g) == id >>> lift(g)
+// Suppose lift(identity) = identity
+// If f = identity, g is any function
+// lift(identity) >> map(g) == map(identity) >>> lift(g)
+// identity >>> map(g) == identity >>> lift(g)
 // map(g) == lift(g)
 
 func r<A>(_ xs: [A]) -> A? {
   fatalError()
 }
 
-
 enum Result<A, E> {
   case success(A)
   case failure(E)
 }
 
-
 func map<A, B, E>(_ f: @escaping (A) -> B) -> (Result<A, E>) -> Result<B, E> {
   return { result in
     switch result {
-    case let .success(a):
+    case .success(let a):
       return .success(f(a))
-    case let .failure(e):
+    case .failure(let e):
       return .failure(e)
     }
   }
@@ -137,18 +126,17 @@ Result<Int, String>.success(42)
 Result<Int, String>.failure("Error")
   |> map(incr)
 
-
 struct F1<A> {
   let value: A
 }
 
 func map<A, B>(_ f: @escaping (A) -> B) -> (F1<A>) -> F1<B> {
   return { f1 in
-    F1(value: f(f1.value))
+    return F1(value: f(f1.value))
   }
 }
 
-// map(id) == id
+// map(identity) = identity
 
 //return { f1 in
 //  F1(value: id(f1.value))
@@ -162,8 +150,7 @@ func map<A, B>(_ f: @escaping (A) -> B) -> (F1<A>) -> F1<B> {
 //  f1
 //}
 
-//return { $0 }
-
+// return { $0 }
 
 struct F2<A, B> {
   let apply: (A) -> B

@@ -416,7 +416,6 @@ func zeroOrMore<A>(
   }
 }
 
-
 zeroOrMore(money, separatedBy: literal(","))
   .run("€42,£42,$42,")
   .match
@@ -433,13 +432,13 @@ let commaOrNewline = char
   .flatMap { $0 == "," || $0 == "\n" ? always(()) : .never }
 
 dump(
-zeroOrMore(money, separatedBy: commaOrNewline)
-  .run("""
+  zeroOrMore(money, separatedBy: commaOrNewline)
+    .run("""
 €42,£42,$42
 €42,£42,$42
 €42,£42,$42,฿10
 """)
-  .match)
+    .match)
 
 zeroOrMore(money, separatedBy: commaOrNewline)
   .run("""
@@ -600,5 +599,83 @@ London, £500
 """
 
 dump(
-races.run(upcomingRaces).match
+  races.run(upcomingRaces).match
 )
+
+/*
+ Many higher-order functions on Array are also useful to define on Parser as parser combinators. As an example, define a compactMap with the following signature: ((A) -> B?) -> (Parser<A>) -> Parser<B>.
+ */
+func compactMap<A, B>(_ t: @escaping (A) -> B?) -> (Parser<A>) -> Parser<B> {
+  return { pa in
+    Parser<B> { str in
+      let original = str
+      guard let a = pa.run(&str) else { return nil }
+
+      if let b = t(a) {
+        return b
+      } else {
+        str = original
+        return nil
+      }
+    }
+  }
+}
+
+/*
+ Define a filter parser combinator with the following signature: ((A) -> Bool) -> (Parser<A>) -> Parser<B>.
+ */
+func filter<A>(_ isIncluded: @escaping (A) -> Bool) -> (Parser<A>) -> Parser<A> {
+  return { pa in
+    Parser<A> { str in
+      let original = str
+      guard let a = pa.run(&str) else { return nil }
+
+      if isIncluded(a) {
+        return a
+      } else {
+        str = original
+        return nil
+      }
+    }
+  }
+}
+
+/*
+ Define filter in terms of compactMap.
+ */
+
+func cmFilter<A>(_ isInculed: @escaping (A) -> Bool) -> (Parser<A>) -> Parser<A> {
+  return { pa in
+    let f = compactMap { (a: A) -> A? in if isInculed(a) { return a } else { return nil } }
+    return f(pa)
+  }
+}
+
+/*
+ Define an either parser combinator with the following signature: ((A) -> Either<B, C>) -> (Parser<A>) -> Parser<Either<B, C>>.
+ */
+
+enum Either<Left, Right> {
+  case left(Left)
+  case rigt(Right)
+}
+
+func either<A, B, C>(_ t: @escaping (A) -> Either<B, C>) -> (Parser<A>) -> Parser<Either<B, C>> {
+  return { pa in
+    Parser<Either<B, C>> { str in
+      guard let a = pa.run(&str) else { return nil }
+      return t(a)
+    }
+  }
+}
+
+/*
+ Redefine the double parser using parser combinators like oneOf to be more resilient than the one we’ve currently defined. It should handle positive and negative numbers and ignore trailing decimals. I.e. it should parse "1" as 1.0, "-42" as -42.0, "+50" as 50.0, and “-123.456.789” as -123.456 without consuming ".789".
+ */
+
+let sign = oneOf([literal("+").map { true }, literal("-").map { false }, literal("").map { true }])
+
+
+
+
+

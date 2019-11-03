@@ -4,39 +4,30 @@ struct User {
   let email: String
 }
 
-let user = User(id: 1, email: "blob@pointfree.co")
+let user = User(id: 1, email: "mail@gmail.com")
 user.id
 user.email
 
-let f = { (user: User) in user.id } >>> String.init
+let getID = { (user: User) in user.id }
 
-\User.id // KeyPath<User, Int>
+user[keyPath: \User.email]
 
-user[keyPath: \User.id]
-user.id
-
-func get<Root, Value>(_ kp: KeyPath<Root, Value>) -> (Root) -> Value {
+func get<Root, Value>(_ keyPath: KeyPath<Root, Value>) -> (Root) -> Value {
   return { root in
-    root[keyPath: kp]
+    return root[keyPath: keyPath]
   }
 }
 
-get(\User.id) >>> String.init
-
+get(\User.id) >>> String.init // (User) -> String
 
 extension User {
   var isStaff: Bool {
-    return self.email.hasSuffix("@pointfree.co")
+    return email.hasSuffix("@uptech.team")
   }
 }
 
 user.isStaff
-
-\User.isStaff
-user[keyPath: \User.isStaff]
-
 get(\User.isStaff)
-
 
 let users = [
   User(id: 1, email: "blob@pointfree.co"),
@@ -45,28 +36,16 @@ let users = [
   User(id: 4, email: "a.morphism@category.theory")
 ]
 
-users
-  .map { $0.email }
-
-//users
-//  .map(\User.email)
-
-
 extension Sequence {
-  func map<Value>(_ kp: KeyPath<Element, Value>) -> [Value] {
-    return self.map { $0[keyPath: kp] }
+  func map<Value>(_ keyPath: KeyPath<Element, Value>) -> [Value] {
+    return self.map { $0[keyPath: keyPath] }
   }
 }
 
-users
-  .map(\User.email)
-users
-  .map(\.email)
-//users
-//  .filter(\.isStaff)
+users.map(\.id)
 
 users
-  .map(get(\.email))
+  .map(get(\.id))
 
 users
   .filter(get(\.isStaff))
@@ -78,42 +57,32 @@ users
 users
   .map(get(\.email) >>> get(\.count))
 
-
 users
   .map(get(\.email.count))
 
 users
   .filter(get(\.isStaff) >>> (!))
 
-
 users
   .filter((!) <<< get(\.isStaff))
 
 users
-  .sorted(by: { $0.email.count < $1.email.count })
+  .sorted(by: { $0.id < $1.id })
 
-//users.sorted(by: <#T##(User, User) throws -> Bool#>)
+////users.sorted(by: <#T##(User, User) throws -> Bool#>)
 
 func their<Root, Value>(_ f: @escaping (Root) -> Value, _ g: @escaping (Value, Value) -> Bool) -> (Root, Root) -> Bool {
 
-  return { g(f($0), f($1)) }
+  return { lhs, rhs in
+    return g(f(lhs), f(rhs))
+  }
 }
 
+users
+  .sorted(by: their(get(\.id), >))
 
 users
-  .sorted(by: their(get(\.email), <))
-
-users
-  .sorted(by: their(get(\.email), >))
-
-users
-  .sorted(by: their(get(\.email.count), >))
-
-users
-  .max(by: their(get(\.email), <))?.email
-
-users
-  .min(by: their(get(\.email), <))?.email
+  .max(by: their(get(\.id), <))?.id
 
 func their<Root, Value: Comparable>(_ f: @escaping (Root) -> Value) -> (Root, Root) -> Bool {
 
@@ -121,15 +90,10 @@ func their<Root, Value: Comparable>(_ f: @escaping (Root) -> Value) -> (Root, Ro
 }
 
 users
-  .max(by: their(get(\.email)))?.email
-
-users
-  .min(by: their(get(\.email)))?.email
-
+  .max(by: their(get(\.id)))?.id
 
 [1, 2, 3]
   .reduce(0, +)
-
 
 struct Episode {
   let title: String
@@ -146,6 +110,8 @@ let episodes = [
 episodes
   .reduce(0) { $0 + $1.viewCount }
 
+//episodes.reduce(<#T##initialResult: Result##Result#>, <#T##nextPartialResult: (Result, Episode) throws -> Result##(Result, Episode) throws -> Result#>)
+
 func combining<Root, Value>(
   _ f: @escaping (Root) -> Value,
   by g: @escaping (Value, Value) -> Value
@@ -153,40 +119,21 @@ func combining<Root, Value>(
   -> (Value, Root)
   -> Value {
 
-    return { value, root in
-      g(value, f(root))
+    return { (value, root) in
+      return g(value, f(root))
     }
 }
 
 episodes.reduce(0, combining(get(\.viewCount), by: +))
 
-
-
 prefix operator ^
 prefix func ^ <Root, Value>(_ kp: KeyPath<Root, Value>) -> (Root) -> Value {
-  return get(kp)
+  return { $0[keyPath: kp] }
 }
 
 ^\User.id
-users.map(^\.id)
-
+users.map(^\.email)
 users.map(^\.email.count)
 users.map(^\.email.count >>> String.init)
-
-users.filter(^\.isStaff)
-users.filter((!) <<< ^\.isStaff)
-
-users.sorted(by: their(^\.email))
-users.sorted(by: their(^\.email, >))
-
-users.max(by: their(^\.email.count))?.email
-users.min(by: their(^\.email.count))?.email
-
-/*:
-[Greg Titus](https://twitter.com/gregtitus) and Point-Free’s own [Stephen Celis](https://twitter.com/stephencelis)
-have since [pitched a Swift Evolution proposal](https://forums.swift.org/t/key-path-expressions-as-functions/19587)
-and [an implementation](https://github.com/apple/swift/pull/19448) to allow `\Root.value` key path expressions
-to be used wherever `(Root) -> Value` functions are applicable.
-*/
-
+users.sorted(by: their(^\.id))
 //: [See the next page](@next) for exercises!

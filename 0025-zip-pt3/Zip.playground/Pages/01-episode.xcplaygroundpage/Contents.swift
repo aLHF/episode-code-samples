@@ -78,16 +78,14 @@ func zip2<A, B, E>(_ a: Result<A, E>, _ b: Result<B, E>) -> Result<(A, B), E> {
   case let (.failure(e), .success):
     return .failure(e)
   case let (.failure(e1), .failure(e2)):
-//    return .failure(e1)
+    //    return .failure(e1)
     return .failure(e2)
   }
 }
 
-import NonEmpty
-
 enum Validated<A, E> {
   case valid(A)
-  case invalid(NonEmptyArray<E>)
+  case invalid([E])
 }
 
 func map<A, B, E>(_ f: @escaping (A) -> B) -> (Validated<A, E>) -> Validated<B, E> {
@@ -111,7 +109,8 @@ func zip2<A, B, E>(_ a: Validated<A, E>, _ b: Validated<B, E>) -> Validated<(A, 
   case let (.invalid(e), .valid):
     return .invalid(e)
   case let (.invalid(e1), .invalid(e2)):
-    return .invalid(e1 + e2)
+    //    return .invalid(e1 + e2)
+    fatalError()
   }
 }
 
@@ -237,21 +236,27 @@ let optionalId: Int? = 42
 let optionalName: String? = "Blob"
 
 func validate(email: String) -> Validated<String, String> {
-  return email.index(of: "@") == nil
-    ? .invalid(NonEmptyArray("email is invalid"))
-    : .valid(email)
+  return .valid(email)
+
+  //  return email.index(of: "@") == nil
+  //    ? .invalid(NonEmptyArray("email is invalid"))
+  //    : .valid(email)
 }
 
 func validate(id: Int) -> Validated<Int, String> {
-  return id <= 0
-    ? .invalid(NonEmptyArray("id must be positive"))
-    : .valid(id)
+  return .valid(id)
+
+  //  return id <= 0
+  //    ? .invalid(NonEmptyArray("id must be positive"))
+  //    : .valid(id)
 }
 
 func validate(name: String) -> Validated<String, String> {
-  return name.isEmpty
-    ? .invalid(NonEmptyArray("name can't be blank"))
-    : .valid(name)
+  return .valid(name)
+
+  //  return name.isEmpty
+  //    ? .invalid(NonEmptyArray("name can't be blank"))
+  //    : .valid(name)
 }
 
 
@@ -311,3 +316,89 @@ zip3(with: User.init)(
 )
 
 
+// Homework
+/*:
+ 2) There is a function closely related to zip called apply. It has the following shape: apply: (F<(A) -> B>, F<A>) -> F<B>. Define apply for Array, Optional, Result, Validated, Func and Parallel.
+ */
+func apply<A, B>(_ a: [(A) -> B], b: [A]) -> [B] {
+  return zip(a, b).map { $0($1) }
+}
+
+func apply<A, B>(_ a: ((A) -> B)?, b: A?) -> B? {
+  return zip2(a, b).map { $0($1) }
+}
+
+func apply<A, B, E>(_ a: Result<(A) -> B, E>, b: Result<A, E>) -> Result<B, E> {
+  return zip2(a, b) |> map { $0($1) }
+}
+
+func apply<A, B, E>(_ a: Validated<(A) -> B, E>, b: Validated<A, E>) -> Validated<B, E> {
+  return zip2(a, b) |> map { $0($1) }
+}
+
+func apply<A, B, R>(_ a: Func<R, (A) -> B>, b: Func<R, A>) -> Func<R, B> {
+  return zip2(a, b) |> map { $0($1) }
+}
+
+func apply<A, B>(_ a: Parallel<(A) -> B>, b: Parallel<A>) -> Parallel<B> {
+  return zip2(a, b) |> map { $0($1) }
+}
+
+/*:
+ 3) Another closely related function to zip is called alt, and it has the following shape: alt: (F<A>, F<A>) -> F<A>. Define alt for Array, Optional, Result, Validated and Parallel. Describe what this function semantically means for each of the types.
+ */
+func alt<A>(_ a: [A], _ b: [A]) -> [A] {
+  return a + b
+}
+
+func alt<A>(_ a: A?, _ b: A?) -> A? {
+  switch (a, b) {
+  case (.none, .none):
+    return .none
+  case let (.some(a), .none):
+    return a
+  case let (.none, .some(b)):
+    return b
+  case let (.some(a), .some):
+    return a
+  }
+}
+
+func alt<A, E>(_ a: Result<A, E>, _ b: Result<A, E>) -> Result<A, E> {
+  switch (a, b) {
+  case let (.success(value), .success):
+    return .success(value)
+
+  case let (.failure(error), .failure):
+    return .failure(error)
+
+  case let (.success, .failure(error)):
+    return .failure(error)
+
+  case let (.failure(error), .success):
+    return .failure(error)
+  }
+}
+
+func alt<A, E>(_ a: Validated<A, E>, _ b: Validated<A, E>) -> Validated<A, E> {
+  switch (a, b) {
+  case let (.valid(value), .valid):
+    return .valid(value)
+
+  case let (.invalid(arr1), .invalid(arr2)):
+    return .invalid(arr1 + arr2)
+
+  case let (.valid, .invalid(arr)):
+    return .invalid(arr)
+
+  case let (.invalid(arr), .valid):
+    return .invalid(arr)
+  }
+}
+
+func alt<A>(_ a: Parallel<A>, _ b: Parallel<A>) -> Parallel<A> {
+  return Parallel { callback in
+    a.run(callback)
+    b.run(callback)
+  }
+}

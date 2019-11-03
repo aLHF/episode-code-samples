@@ -442,3 +442,82 @@ dump(
 €42,£42,$42,€42,£42,$42,€42,£42,$42,€42,£42,$42
 """)
     .match)
+
+/*
+ 1. We quickly added a separatedBy argument to zeroOrMore, but it can be very useful to parse out an array of values without a separator. Give separatedBy a default parser for this behavior. Is this a parser we’ve already encountered?
+*/
+
+func zeroOrMore1<A>(
+  _ p: Parser<A>,
+  separatedBy s: Parser<Void> = always(())
+  ) -> Parser<[A]> {
+  return Parser<[A]> { str in
+    var rest = str
+    var matches: [A] = []
+    while let match = p.run(&str) {
+      rest = str
+      matches.append(match)
+      if s.run(&str) == nil {
+        return matches
+      }
+    }
+    str = rest
+    return matches
+  }
+}
+
+zeroOrMore1(money)
+  .run("€42£42$42")
+  .match
+
+
+/*
+2. Add an until parser argument to zeroOrMore (and oneOrMore) that parses a number of values until the given parser succeeds.
+*/
+
+func zeroOrMore2<A>(
+  _ p: Parser<A>,
+  separatedBy s: Parser<Void> = always(()),
+  until u: Parser<Void>
+  ) -> Parser<[A]> {
+  return Parser<[A]> { str in
+    var rest = str
+    var matches: [A] = []
+    while let match = p.run(&str) {
+      if u.run(&str) != nil {
+        str = rest
+        return matches
+      }
+
+      rest = str
+      matches.append(match)
+      if s.run(&str) == nil {
+        return matches
+      }
+    }
+    str = rest
+    return matches
+  }
+}
+
+/*
+3. Make this until parser argument optional by providing a default parser value. Is this a parser we’ve already encountered?
+*/
+
+// never
+
+/*
+4. Define a parser combinator, oneOf, that takes an array of Parser<A>s as input and produces a single parser of Parser<A>. What can/should this parser do?
+*/
+
+func oneOf<A>(_ arr: [Parser<A>]) -> Parser<A> {
+  return Parser<A> { str in
+    for parser in arr {
+      if let value = parser.run(&str) {
+        return value
+      }
+    }
+
+    return nil
+  }
+}

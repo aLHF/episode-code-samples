@@ -1,15 +1,14 @@
-
 square(incr(2))
 
 2 |> incr |> square
+2 |> incr >>> square
 
-
-// let label = UILabel()
-// with(label) {
-//   $0.numberOfLines = 0
-//   $0.font = .systemFont(ofSize: 17)
-//   $0.textColor = .red
-// }
+//let label = UILabel()
+//with(label) {
+//  $0.textColor = .red
+//  $0.numberOfLines = 0
+//  $0.font = .systemFont(ofSize: 17)
+//}
 
 // let label = UILabel()
 // label |> {
@@ -23,28 +22,25 @@ func with<A, B>(_ a: A, _ f: (A) -> B) -> B {
 }
 
 with(2, incr)
-//with(2, incr, square)
-with(with(2, incr), square)
 
 2 |> incr |> square
 2 |> incr >>> square
 with(2, incr >>> square)
 
 func pipe<A, B, C>(_ f: @escaping (A) -> B, _ g: @escaping (B) -> C) -> (A) -> C {
-  return { g(f($0)) }
+  return { a in g(f(a)) }
 }
 
 with(2, pipe(incr, square))
 
 incr >>> square >>> String.init
 
-
 func pipe<A, B, C, D>(
   _ f: @escaping (A) -> B,
   _ g: @escaping (B) -> C,
   _ h: @escaping (C) -> D
   ) -> (A) -> D {
-  return { h(g(f($0))) }
+  return { a in h(g(f(a))) }
 }
 
 with(2, pipe(incr, square, String.init))
@@ -62,30 +58,26 @@ with(2, pipe(
   String.init
 ))
 
-
 func computeAndPrint(_ x: Int) -> (Int, [String]) {
   let computation = x * x + 1
-  return (computation, ["Computed \(computation)"])
+  return (computation, ["Computed: \(computation)"])
 }
 
 2 |> computeAndPrint
 2 |> computeAndPrint >=> computeAndPrint
 
-
 func chain<A, B, C>(
   _ f: @escaping (A) -> (B, [String]),
   _ g: @escaping (B) -> (C, [String])
-  ) -> ((A) -> (C, [String])) {
-
+  ) -> (A) -> (C, [String]) {
   return { a in
-    let (b, logs) = f(a)
-    let (c, moreLogs) = g(b)
-    return (c, logs + moreLogs)
+    let (b, logs1) = f(a)
+    let (c, logs2) = g(b)
+    return (c, logs1 + logs2)
   }
 }
 
 with(2, chain(computeAndPrint, computeAndPrint))
-
 with(2, chain(computeAndPrint, chain(computeAndPrint, computeAndPrint)))
 
 2
@@ -135,7 +127,6 @@ with(
   )
 )
 
-
 func roundedStyle(_ view: UIView) {
   view.clipsToBounds = true
   view.layer.cornerRadius = 6
@@ -146,11 +137,11 @@ let baseButtonStyle: (UIButton) -> Void = {
   $0.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
 }
 
-//let roundButtonStyle =
-//  baseButtonStyle
-//    <> roundedStyle
+let roundButtonStyle =
+  baseButtonStyle
+    <> roundedStyle
 
-func concat<A: AnyObject>(_ f: @escaping (A) -> Void, _ g: @escaping (A) -> Void, _ fs: ((A) -> Void)...) -> (A) -> Void {
+func concat<A>(_ f: @escaping (A) -> Void, _ g: @escaping (A) -> Void, _ fs: ((A) -> Void)...)  -> (A) -> Void {
   return { a in
     f(a)
     g(a)
@@ -158,10 +149,10 @@ func concat<A: AnyObject>(_ f: @escaping (A) -> Void, _ g: @escaping (A) -> Void
   }
 }
 
-//let roundButtonStyle = concat(
-//  baseButtonStyle,
-//  roundedStyle
-//)
+let roundButtonStyleWithoutOperator = concat(
+  baseButtonStyle,
+  roundedStyle
+)
 
 let filledButtonStyle = concat(
   baseButtonStyle,

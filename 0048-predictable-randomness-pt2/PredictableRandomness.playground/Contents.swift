@@ -12,13 +12,18 @@ do {
 }
 
 struct Gen<A> {
-  let run: (inout AnyRandomNumberGenerator) -> A
+  let gen: (inout AnyRandomNumberGenerator) -> A
 
   func run<RNG: RandomNumberGenerator>(using rng: inout RNG) -> A {
     var arng = AnyRandomNumberGenerator(rng: rng)
-    let result = self.run(&arng)
+    let result = self.gen(&arng)
     rng = arng.rng as! RNG
     return result
+  }
+
+  func run() -> A {
+    var srng = SystemRandomNumberGenerator()
+    return self.run(using: &srng)
   }
 }
 
@@ -35,7 +40,7 @@ struct Gen<A> {
 
 extension Gen {
   func map<B>(_ f: @escaping (A) -> B) -> Gen<B> {
-    return Gen<B> { rng in f(self.run(&rng)) }
+    return Gen<B> { rng in f(self.gen(&rng)) }
   }
 }
 
@@ -219,9 +224,9 @@ extension Gen {
 extension Gen {
   func flatMap<B>(_ f: @escaping (A) -> Gen<B>) -> Gen<B> {
     return Gen<B> { rng in
-      let a = self.run(&rng)
+      let a = self.gen(&rng)
       let genB = f(a)
-      let b = genB.run(&rng)
+      let b = genB.gen(&rng)
       return b
     }
   }
@@ -233,17 +238,17 @@ extension Gen {
       Gen<[A]> { rng -> [A] in
         var array: [A] = []
         for _ in 1...count {
-          array.append(self.run(&rng))
+          array.append(self.gen(&rng))
         }
         return array
       }
     }
 
     return Gen<[A]> { rng in
-      let numberOfElements = count.run(&rng)
+      let numberOfElements = count.gen(&rng)
       var result: [A] = []
       (0..<numberOfElements).forEach { idx in
-        result.append(self.run(&rng))
+        result.append(self.gen(&rng))
       }
       return result
     }
@@ -253,7 +258,7 @@ extension Gen {
 
 func zip<A, B>(_ ga: Gen<A>, _ gb: Gen<B>) -> Gen<(A, B)> {
   return Gen<(A, B)> { rng in
-    (ga.run(&rng), gb.run(&rng))
+    (ga.gen(&rng), gb.gen(&rng))
   }
 }
 
@@ -268,7 +273,7 @@ func zip4<A, B, C, D, Z>(
 
   return { a, b, c, d in
     Gen<Z> { rng in
-      f(a.run(&rng), b.run(&rng), c.run(&rng), d.run(&rng)) }
+      f(a.gen(&rng), b.gen(&rng), c.gen(&rng), d.gen(&rng)) }
   }
 }
 
@@ -332,3 +337,61 @@ pixelImageView.run(using: &lcrng)
 pixelImageView.run(using: &lcrng)
 pixelImageView.run(using: &lcrng)
 lcrng.seed
+
+/*
+ 1.We’ve all but completely recovered the ergonomics of Gen from before we controlled it, but our public run function requires an explicit RandomNumberGenerator is passed in as a dependency. Add an overload to recover the ergonomics of calling gen.run() without a RandomNumberGenerator.
+ */
+
+// Line 24-27
+
+
+/*
+ 2. The Gen type perfectly encapsulates producing a random value from a given mutable random number generator. Generalize Gen to a type State that produces values from a given mutable parameter.
+ */
+
+//struct State< A> {
+//  let run: (inout A) -> A
+//}
+
+struct State<S, A> {
+  let run: (inout S) -> A
+}
+
+/*
+ 3. Recover Gen as a specification of State using a type alias.
+ */
+typealias Generator<A> = State<AnyRandomNumberGenerator, A>
+
+/*
+ 4. Deriving Gen as a type alias of State breaks a bunch of implementations, including:
+ */
+
+extension State {
+  func map<B>(_ t: @escaping (A) -> (B)) -> State<S, B> {
+    return State<S, B> { generator in
+      return t(self.run(&generator))
+    }
+  }
+
+  func flatMap<B>(_ t: @escaping (A) -> State<S, B>) -> State<S, B> {
+    return State<S, B> { generator in
+      return t(self.run(&generator)).run(&generator)
+    }
+  }
+}
+
+extension State where S == AnyRandomNumberGenerator, A: FixedWidthInteger {
+  static func int(in range: ClosedRange<A>) -> State {
+    return State { generator in .random(in: range, using: &generator) }
+  }
+}
+
+extension State where S == AnyRandomNumberGenerator, A: BinaryFloatingPoint, A.RawSignificand: FixedWidthInteger {
+  static func float(in range: ClosedRange<A>) -> State {
+    return State { generator in .random(in: range, using: &generator) }
+  }
+}
+
+extension State where S == AnyRandomNumberGenerator, A == Bool {
+  static let bool = State { rng in .random(using: &rng) }
+}

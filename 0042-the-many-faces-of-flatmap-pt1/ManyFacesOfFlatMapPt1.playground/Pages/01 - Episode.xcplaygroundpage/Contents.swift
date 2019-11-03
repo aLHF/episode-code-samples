@@ -105,6 +105,16 @@ enum Result<A, E> {
       return .failure(e)
     }
   }
+
+  func flatMap<B>(_ f: @escaping (A) -> Result<B, E>) -> Result<B, E> {
+    switch self {
+    case .success(let value):
+      return f(value)
+
+    case .failure(let error):
+      return .failure(error)
+    }
+  }
 }
 
 Result<Double, String>.success(42.0)
@@ -148,6 +158,16 @@ enum Validated<A, E> {
       return .invalid(e)
     }
   }
+
+  func flatMap<B>(_ f: @escaping (A) -> Validated<B, E>) -> Validated<B, E> {
+    switch self {
+    case .valid(let a):
+      return f(a)
+
+    case .invalid(let e):
+      return .invalid(e)
+    }
+  }
 }
 
 struct Func<A, B> {
@@ -181,22 +201,22 @@ let words = Func<Void, [String]> {
     .split(separator: "\n")
     .map(String.init)
 }
-
-words
-words
-  .run(())
-
-randomNumber.map { number in
-  words.map { words in
-    words[number]
-  }
-}
-
-randomNumber.map { number in
-  words.map { words in
-    words[number]
-  }
-}.run(()).run(())
+//
+//words
+//words
+//  .run(())
+//
+//randomNumber.map { number in
+//  words.map { words in
+//    words[number]
+//  }
+//}
+//
+//randomNumber.map { number in
+//  words.map { words in
+//    words[number]
+//  }
+//}.run(()).run(())
 
 
 struct Parallel<A> {
@@ -220,24 +240,24 @@ func delay(by duration: TimeInterval, line: UInt = #line) -> Parallel<Void> {
   }
 }
 
-
-delay(by: 1).run { print("Executed after 1 second") }
-delay(by: 2).run { print("Executed after 2 seconds") }
-
-let aDelayedInt = delay(by: 3).map { 42 }
-aDelayedInt.run { value in print("We got \(value)") }
-
-aDelayedInt.map { value in
-  delay(by: 1).map { value + 1729 }
-}
-
-aDelayedInt.map { value in
-  delay(by: 1).map { value + 1729 }
-  }.run { innerParallel in
-    innerParallel.run { value in
-      print("We got \(value)")
-    }
-}
+//
+//delay(by: 1).run { print("Executed after 1 second") }
+//delay(by: 2).run { print("Executed after 2 seconds") }
+//
+//let aDelayedInt = delay(by: 3).map { 42 }
+//aDelayedInt.run { value in print("We got \(value)") }
+//
+//aDelayedInt.map { value in
+//  delay(by: 1).map { value + 1729 }
+//}
+//
+//aDelayedInt.map { value in
+//  delay(by: 1).map { value + 1729 }
+//  }.run { innerParallel in
+//    innerParallel.run { value in
+//      print("We got \(value)")
+//    }
+//}
 
 
 // extension Sequence {
@@ -249,5 +269,136 @@ aDelayedInt.map { value in
 // }
 
 
+/*:
+ 1. In this episode we saw that the combos function on arrays can be implemented in terms of flatMap and map. The zip function on arrays as the same signature as combos. Can zip be implemented in terms of flatMap and map?
+ */
+func zip1<A, B>(_ a: [A], _ b: [B]) -> [(A, B)] {
+//  return a.flatMap {  }
+
+  fatalError()
+}
+
+// Impossible
+
+/*:
+ 2. Define a flatMap method on the Result<A, E> type. Its signature looks like:
+
+ (Result<A, E>, (A) -> Result<B, E>) -> Result<B, E>
+ It only changes the A generic while leaving the E fixed.
+ */
+func flatMapResult<A, B, E>(_ a: Result<A, E>, _ b: (A) -> Result<B, E>) -> Result<B, E> {
+  switch a {
+  case .success(let value):
+    return b(value)
+
+  case .failure(let error):
+    return .failure(error)
+  }
+}
+
+let result1: Result<Int, Error> = Result.success(2)
+let result2 = flatMapResult(result1) { (value) -> Result<String, Error> in
+  return Result.success(String(value))
+}
+
+/*:
+ 3. Can the zip function we defined on Result<A, E> in episode #24 be implemented in terms of the flatMap you implemented above? If so do it, otherwise explain what goes wrong.
+ */
+//func zip2<A, B, E>(_ a: Result<A, E>, _ b: Result<B, E>) -> Result<(A, B), E> {
+//  switch (a, b) {
+//  case let (.success(a), .success(b)):
+//    return .success((a, b))
+//  case let (.success, .failure(e)):
+//    return .failure(e)
+//  case let (.failure(e), .success):
+//    return .failure(e)
+//  case let (.failure(e1), .failure(e2)):
+//    ???
+//  }
+//}
+
+func zip2<A, B, E>(_ a: Result<A, E>, _ b: Result<B, E>) -> Result<(A, B), E> {
+  return a.flatMap { a in b.map { b in return Result<(A, B), E>.success((a, b)) } }
+}
+
+/*:
+ 4. Define a flatMap method on the Validated<A, E> type. Its signature looks like:
+
+ (Validated<A, E>, (A) -> Validated<B, E>) -> Validated<B, E>
+ It only changes the A generic while leaving the E fixed. How similar is it to the flatMap you defined on Result?
+ */
+func flatMap<A, B, E>(_ a: Validated<A, E>, _ b: (A) -> Validated<B, E>) -> Validated<B, E> {
+  switch a {
+  case .valid(let a):
+    return b(a)
+
+  case .invalid(let e):
+    return .invalid(e)
+  }
+}
+
+/*:
+ 5. Can the zip function we defined on Validated<A, E> in episode #24 be defined in terms of the flatMap above? If so do it, otherwise explain what goes wrong.
+ */
+//func zip2<A, B, E>(_ a: Validated<A, E>, _ b: Validated<B, E>) -> Validated<(A, B), E> {
+//  switch (a, b) {
+//  case let (.valid(a), .valid(b)):
+//    return .valid((a, b))
+//  case let (.valid, .invalid(e)):
+//    return .invalid(e)
+//  case let (.invalid(e), .valid):
+//    return .invalid(e)
+//  case let (.invalid(e1), .invalid(e2)):
+//    //    return .failure(e1)
+//    return . invalid(e2)
+//  }
+//}
+
+func zip2<A, B, E>(_ a: Validated<A, E>, _ b: Validated<B, E>) -> Validated<(A, B), E> {
+  return a.flatMap { a in b.flatMap { b in Validated.valid((a, b)) } }
+}
+
+/*:
+ 6. Define a flatMap method on the Func<A, B> type. Its signature looks like:
+
+ (Func<A, B>, (B) -> Func<A, C>) -> Func<A, C>
+ It only changes the B generic while leaving the A fixed.
+ */
+func flatMap<A, B, C>(_ a: Func<A, B>, _ b: @escaping (B) -> Func<A, C>) -> Func<A, C> {
+  return Func<A, C> { inner in
+    let bValue = a.run(inner)
+    let funcAC = b(bValue)
+    return funcAC.run(inner)
+  }
+}
+
+/*:
+ 7. Can the zip function we defined on Func<A, B> in episode #24 be implemented in terms of the flatMap you implemented above? If so do it, otherwise explain what goes wrong.
+ */
+
+//func zip2<A, B, R>(_ r2a: Func<R, A>, _ r2b: Func<R, B>) -> Func<R, (A, B)> {
+//  return Func<R, (A, B)> { r in
+//    (r2a.apply(r), r2b.apply(r))
+//  }
+//}
+
+func zip2<A, B, R>(_ r2a: Func<R, A>, _ r2b: Func<R, B>) -> Func<R, (A, B)> {
+  return flatMap(r2a, { a -> Func<A, C> in
+    return r2b.map { b in (a, b) }
+  })
+}
 
 
+/*:
+ 8. Define a flatMap method on the Parallel<A> type. Its signature looks like:
+
+ (Parallel<A>, (A) -> Parallel<B>) -> Parallel<B>
+ */
+func flatMap<A,B>(_ a: Parallel<A>, _ b: @escaping (A) -> Parallel<B>) -> Parallel<B> {
+  return Parallel<B> { callback in
+    a.run { a in
+      let parB = b(a)
+      parB.run { b in callback(b) }
+    }
+  }
+}

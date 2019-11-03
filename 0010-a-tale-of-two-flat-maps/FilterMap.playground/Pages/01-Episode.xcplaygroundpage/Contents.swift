@@ -12,33 +12,30 @@ let csv = """
 
 csv
   .split(separator: "\n")
-  .map { $0.split(separator: ",") }
-
-
+  .flatMap { $0.split(separator: ",") }
 
 // extension Optional {
 //   func flatMap<B>(_ f: @escaping (Element) -> B?) -> B? {
 //   }
 // }
 
-String.init(data: Data(), encoding: .utf8)
-  .map(Int.init)
-
-let _: Int? = String.init(data: Data([55]), encoding: .utf8)
+let _: Int? = String(data: Data(), encoding: .utf8)
   .flatMap(Int.init)
 
-["1", "2", "buckle", "my", "shoe"]
+let _: Int? = String(data: Data([55]), encoding: .utf8)
+  .flatMap(Int.init)
+
+
+let _: [Int?] = ["1", "2", "buckle", "my", "shoe"]
   .map(Int.init)
 
-["1", "2", "buckle", "my", "shoe"]
+let _: [Int] = ["1", "2", "buckle", "my", "shoe"]
   .flatMap(Int.init)
 
 csv.split(separator: "\n")
   .flatMap { $0.split(separator: ",") }
+  .map(String.init)
   .flatMap { Int($0) }
-  .reduce(0, +)
-
-
 
 
 // flatMap : ((A) -> [B]) -> ([A]) -> [B]
@@ -47,12 +44,10 @@ csv.split(separator: "\n")
 // flatMap : ((A) ->  B?) -> ([A]) -> [B]
 
 
-
 // flatMap : ((A) ->    Array<B>) -> (   Array<A>) ->    Array<B>
 // flatMap : ((A) -> Optional<B>) -> (Optional<A>) -> Optional<B>
 
 // flatMap : ((A) -> Optional<B>) -> (   Array<A>) ->    Array<B>
-
 
 
 // flatMap : ((A) -> M<B>) -> (M<A>) -> M<B>
@@ -60,41 +55,42 @@ csv.split(separator: "\n")
 
 // flatMap : ((A) -> B?) -> (M<A>) -> M<B>
 
-
+//[1, 2, 3]
+//  .flatMap { .some($0 + 1) }
 
 [1, 2, 3]
-  .flatMap { $0 + 1 }
-
-
+  .map { $0 + 1 }
 
 struct User {
   let name: String
 }
 
 let users = [User(name: "Blob"), User(name: "Math")]
+
 users
   .map { $0.name }
+
 users
   .flatMap { $0.name }
-
-
 
 extension Array {
   func filterMap<B>(_ transform: (Element) -> B?) -> [B] {
     var result = [B]()
+    result.reserveCapacity(count)
+
     for x in self {
       switch transform(x) {
-      case let .some(x):
-        result.append(x)
+      case .some(let value):
+        result.append(value)
+
       case .none:
         continue
       }
     }
+
     return result
   }
 }
-
-
 
 extension Array {
   func compactMap<B>(_ transform: (Element) -> B?) -> [B] {
@@ -111,19 +107,15 @@ extension Array {
   }
 }
 
-
-
 func filterSome<A>(_ p: @escaping (A) -> Bool) -> (A) -> A? {
   return { p($0) ? .some($0) : .none }
 }
-
 
 func filter<A>(_ p: @escaping (A) -> Bool) -> ([A]) -> [A] {
   return { $0.filterMap(filterSome(p)) }
 }
 
-
-Array(0..<10)
+Array(1...10)
   |> filter { $0 % 2 == 0 }
 
 enum Either<A, B> {
@@ -131,15 +123,9 @@ enum Either<A, B> {
   case right(B)
 }
 
-
-
 func partitionEither<A>(_ p: @escaping (A) -> Bool) -> (A) -> Either<A, A> {
   return { p($0) ? .right($0) : .left($0) }
 }
-
-
-
-
 
 extension Array {
   func partitionMap<A, B>(_ transform: (Element) -> Either<A, B>) -> (lefts: [A], rights: [B]) {
@@ -163,8 +149,6 @@ func partition<A>(_ p: @escaping (A) -> Bool) -> ([A]) -> (`false`: [A], `true`:
   }
 }
 
-
-
 func partitionMap<A, B, C>(_ p: @escaping (A) -> Either<B, C>) -> ([A]) -> (lefts: [B], rights: [C]) {
   return { $0.partitionMap(p) }
 }
@@ -175,4 +159,3 @@ partitionMap(evenOdds)
 Array(1...10)
   |> partitionMap(evenOdds)
   |> (first <<< map)(square)
-//: [See the next page](@next) for exercises!

@@ -29,7 +29,15 @@ class Visitor: SyntaxVisitor {
   }
 
   override func visit(_ node: EnumCaseElementSyntax) -> SyntaxVisitorContinueKind {
-    print("  var \(node.identifier): \(node.associatedValue!.parameterList)? {")
+    let type: String = {
+      if node.associatedValue!.parameterList.count > 1 {
+        return "(\(node.associatedValue!.parameterList))"
+      } else {
+        return "\(node.associatedValue!.parameterList)"
+      }
+    }()
+    
+    print("  var \(node.identifier): \(type)? {")
     print("    guard case let .\(node.identifier)(value) = self else { return nil }")
     print("    return value")
     print("  }")
@@ -41,29 +49,13 @@ let visitor = Visitor()
 tree.walk(visitor)
 
 enum Validated<Valid, Invalid> {
-  case valid(Valid)
-  case invalid([Invalid])
+  case valid(Valid, String)
+  case invalid([Invalid], String)
 }
 
 extension Validated {
-  var valid: Valid? {
+  var valid: (Valid, String)? {
     guard case let .valid(value) = self else { return nil }
     return value
   }
-  var invalid: [Invalid]? {
-    guard case let .invalid(value) = self else { return nil }
-    return value
-  }
 }
-
-let validatedValues: [Validated<Int, String>] = [
-  .valid(1),
-  .invalid(["Failed to calculate value"]),
-  .valid(42),
-]
-
-validatedValues
-  .compactMap { $0.valid }
-
-validatedValues
-  .compactMap { $0.invalid }

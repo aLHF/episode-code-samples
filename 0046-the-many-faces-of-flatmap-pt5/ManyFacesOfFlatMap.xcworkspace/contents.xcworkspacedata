@@ -7,4 +7,7 @@
    <FileRef
       location = "group:ManyFacesOfFlatMap.xcodeproj">
    </FileRef>
+   <FileRef
+      location = "group:ManyFacesOfFlatMap.xcodeproj">
+   </FileRef>
 </Workspace>

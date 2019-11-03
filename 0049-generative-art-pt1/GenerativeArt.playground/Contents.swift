@@ -125,16 +125,18 @@ func bump(
   center: CGFloat,
   plateauSize: CGFloat,
   curveSize: CGFloat
-  ) -> (CGFloat) -> CGFloat {
-  return { x in
-    let plateauSize = plateauSize / 2
-    let curveSize = curveSize / 2
-    let size = plateauSize + curveSize
-    let x = x - center
-    return amplitude * (1 - g((x * x - plateauSize * plateauSize) / (size * size - plateauSize * plateauSize)))
+  ) -> (CGFloat, CGFloat) -> Gen<CGFloat> {
+  return { min, max in
+    Gen<CGFloat> { rng in
+      let plateauSize = plateauSize / 2
+      let curveSize = curveSize / 2
+      let size = plateauSize + curveSize
+      let x = Gen<CGFloat>.float(in: min...max).run(using: &rng) - center
+      return amplitude * (1 - g((x * x - plateauSize * plateauSize) / (size * size - plateauSize * plateauSize)))
+    }
   }
 }
- 
+
 let curve = zip4(with: bump(amplitude:center:plateauSize:curveSize:))(
   Gen<CGFloat>.float(in: -20...(-1)),
   Gen<CGFloat>.float(in: -60...60)
@@ -146,14 +148,13 @@ let curve = zip4(with: bump(amplitude:center:plateauSize:curveSize:))(
 func path(from min: CGFloat, to max: CGFloat, baseline: CGFloat) -> Gen<CGPath> {
   let dx = mainArea.width / CGFloat(numSegments)
   return Gen<CGPath> { rng in
-
     let bump = curve.run(using: &rng)
 
     let path = CGMutablePath()
     path.move(to: CGPoint(x: min, y: baseline))
     stride(from: min, to: max, by: dx)
       .forEach { x in
-        let y = bump(x)
+        let y = bump(min, max).run(using: &rng)
         path.addLine(to: CGPoint(x: x, y: baseline + y))
     }
     return path
@@ -198,3 +199,71 @@ import PlaygroundSupport
 //PlaygroundPage.current.liveView = UIImageView(image:  graph({ bump(amplitude: 0.5, center: 0.25, plateauSize: 0.25, curveSize: 2, $0) }))
 
 PlaygroundPage.current.liveView = UIImageView(image: image.run(using: &lcrng))
+
+
+
+
+// Homework
+
+/*:
+ 1. Create a generator Gen<UIColor> of colors. Can this be expressed in terms of multiple Gen<CGFloat> generators?
+ */
+
+let colorGenerator = zip4(with: UIColor.init(red:green:blue:alpha:))(
+  Gen<CGFloat>.float(in: 0...1),
+  Gen<CGFloat>.float(in: 0...1),
+  Gen<CGFloat>.float(in: 0...1),
+  Gen<CGFloat>.float(in: 0...1)
+)
+
+/*:
+ 2. Create a generator Gen<CGPath> of random lines on a canvas. Can this be expressed in terms of multiple Gen<CGPoint> generators?
+ */
+
+
+func linePath(start: CGPoint, end: CGPoint) -> CGPath {
+  let path = CGMutablePath()
+  path.move(to: start)
+  path.addLine(to: end)
+  return path
+}
+
+let pointGenerator = zip(with: CGPoint.init(x:y:))(
+  Gen<CGFloat>.float(in: canvas.minX...canvas.maxX),
+  Gen<CGFloat>.float(in: canvas.minY...canvas.maxY)
+)
+
+let linePathGenerator = zip(with: linePath(start:end:))(
+  pointGenerator,
+  pointGenerator
+)
+
+/*:
+ 3. Create a generator Gen<UIImage> that draws a random number of randomly positioned straight lines on a canvas with random colors. Try to compose this generator out of lots of smaller generators.
+ */
+
+let imageGenerator3 = Gen<UIImage> { rng in
+  let paths = Array(repeating: 0, count: 50).map { _ in linePathGenerator.run(&rng) }
+  return UIGraphicsImageRenderer(bounds: canvas).image { ctx in
+    let ctx = ctx.cgContext
+    ctx.setFillColor(UIColor.black.cgColor)
+    ctx.fill(canvas)
+
+    ctx.setLineWidth(1.2)
+
+    paths.forEach { path in
+      ctx.setStrokeColor(colorGenerator.run(&rng).cgColor)
+      ctx.addPath(path)
+      ctx.drawPath(using: .fillStroke)
+    }
+  }
+}
+
+//var anyGenerator = AnyRandomNumberGenerator(rng: SystemRandomNumberGenerator())
+//let image3 = imageGenerator3.run(using: &anyGenerator)
+//PlaygroundPage.current.liveView = UIImageView(image: image3)
+
+/*:
+4. Change the bump function we created in this episode so that it adds a bit of random noise to the curve. To do this you will want to change the signature so that it returns a function (CGFloat) -> Gen<CGFloat> instead of just a simple function (CGFloat) -> CGFloat. This will allow you to introduce random perturbations into the y-coordinate of the graph.
+ */
+

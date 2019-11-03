@@ -78,3 +78,8 @@ public func first<A, B, C>(_ f: @escaping (A) -> B) -> ((A, C)) -> (B, C) {
     (f(pair.0), pair.1)
   }
 }
+
+public enum Either<A, B> {
+  case left(A)
+  case right(B)
+}

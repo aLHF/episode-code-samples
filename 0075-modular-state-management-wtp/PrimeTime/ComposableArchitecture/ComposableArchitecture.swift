@@ -7,8 +7,6 @@ public final class Store<Value, Action>: ObservableObject {
   private var cancellable: Cancellable?
 
   public init(initialValue: Value, reducer: @escaping (inout Value, Action) -> Void) {
-//    self.objectWillChange
-//    self.$value.sink(receiveValue: <#T##((Value) -> Void)##((Value) -> Void)##(Value) -> Void#>)
     self.reducer = reducer
     self.value = initialValue
   }
@@ -16,10 +14,6 @@ public final class Store<Value, Action>: ObservableObject {
   public func send(_ action: Action) {
     self.reducer(&self.value, action)
   }
-
-  // ((Value) -> LocalValue) -> (Store<Value ,_>) -> Store<LocalValue, _>
-  // ((A) -> B) -> (Store<A ,_>) -> Store<B, _>
-  // map: ((A) -> B) -> (F<A>) -> F<B>
 
   public func view<LocalValue, LocalAction>(
     value toLocalValue: @escaping (Value) -> LocalValue,
@@ -38,11 +32,18 @@ public final class Store<Value, Action>: ObservableObject {
     return localStore
   }
 
-  // ((LocalAction) -> Action) -> (Store<_, Action>) -> Store<_, LocalAction>
-  // ((B) -> A) -> (Store<_, A>) -> Store<_, B>
-  // pullback: ((B) -> A) -> (F<A>) -> F<B>
-}
 
+  public func send<LocalValue>(
+    _ event: @escaping (LocalValue) -> Action,
+    transform: @escaping
+    (Value) -> LocalValue
+  ) -> Binding<LocalValue> {
+    return Binding<LocalValue>.init(
+      get: { transform(self.value) },
+      set: { self.send(event($0))  }
+    )
+  }
+}
 
 func transform<A, B, Action>(
   _ reducer: (A, Action) -> A,

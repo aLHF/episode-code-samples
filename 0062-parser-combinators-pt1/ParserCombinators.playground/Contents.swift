@@ -342,3 +342,93 @@ Scanner().charactersToBeSkipped = .whitespaces
 
 oneOrMoreSpaces.run("   Hello, world!")
 oneOrMoreSpaces.run("Hello, world!")
+
+/*
+ 1. Define a parser combinator, zeroOrMore, that takes a parser of As as input and produces a parser of Array<A>s by running the existing parser as many times as it can.
+ */
+
+func zeroOrMore<A>(_ parser: Parser<A>) -> Parser<[A]> {
+  return Parser<[A]> { str in
+    var result: [A] = []
+
+    while let value = parser.run(&str) {
+      result.append(value)
+    }
+
+    return result
+  }
+}
+
+/*
+ 2. Define a parser combinator, oneOrMore, that takes a parser of As as input and produces a parser of Array<A>s that must include at least one value.
+ */
+
+func oneOrMore<A>(_ parser: Parser<A>) -> Parser<[A]> {
+  return Parser<[A]> { str in
+    var result: [A] = []
+
+    while let value = parser.run(&str) {
+      result.append(value)
+    }
+
+    guard result.count > 0 else { return nil }
+    return result
+  }
+}
+
+zeroOrMore(literal("a")).run("32j23")
+
+/*
+ 3. Enhance the zeroOrMore and oneOrMore parsers to take a separatedBy argument in order to parse a comma-separated list. Ensure that only separators between parsed values are consumed.
+ */
+
+func zeroOrMore<A>(_ parser: Parser<A>, separatedBy: String) -> Parser<[A]> {
+  return Parser<[A]> { str in
+    let first = parser.run(&str)
+    let partOfResult = oneOrMore(zip(literal(separatedBy), parser).map { $0.1 }).run(&str)
+
+    if let result = partOfResult {
+      if let first = first {
+        return [first] + result
+      } else {
+        return result
+      }
+    } else {
+      if let first = first {
+        return [first]
+      } else {
+        return nil
+      }
+    }
+  }
+}
+
+zeroOrMore(int, separatedBy: ",").run("1")
+
+
+
+func oneOrMore<A>(_ parser: Parser<A>, separatedBy: String) -> Parser<[A]> {
+  return Parser<[A]> { str in
+    var result: [A] = []
+
+    while let value = parser.run(&str) {
+      result.append(value)
+    }
+
+    return result
+  }
+}
+
+/*
+ 4. Redefine the zeroOrMoreSpaces and oneOrMoreSpaces parsers in terms of zeroOrMore and oneOrMore.
+ */
+
+let zeroOrMoreSpaces4 = zeroOrMore(literal(" "))
+let oneOrMoreSpaces4 = oneOrMore(literal(" "))
+
+zeroOrMoreSpaces4.run("   Hello, world!")
+zeroOrMoreSpaces4.run("Hello, world!")
+
+oneOrMoreSpaces4.run("   Hello, world!")
+oneOrMoreSpaces4.run("Hello, world!")
+

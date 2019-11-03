@@ -26,9 +26,9 @@ let compactWitness = Describing<PostgresConnInfo> { conn in
   return "PostgresConnInfo(database: \"\(conn.database)\", hostname: \"\(conn.hostname)\", password: \"\(conn.password)\", port: \"\(conn.port)\", user: \"\(conn.user)\")"
 }
 
-import Overture
-
-let secureCompactWitness = compactWitness.contramap(set(\.password, "*******"))
+let secureCompactWitness = compactWitness.contramap { (conn: PostgresConnInfo) -> PostgresConnInfo in
+  return PostgresConnInfo(database: conn.database, hostname: conn.hostname, password: "******", port: conn.port, user: conn.user)
+}
 
 let localhostPostgres = PostgresConnInfo(
   database: "pointfreeco_development",
@@ -45,16 +45,18 @@ compactWitness.describe(localhostPostgres)
 let prettyWitness = Describing<PostgresConnInfo> {
   """
   PostgresConnInfo(
-    database: \"\($0.database)\",
-    hostname: \"\($0.hostname)\",
-    password: \"\($0.password)\",
-    port: \"\($0.port)\",
-    user: \"\($0.user)\"
+  database: \"\($0.database)\",
+  hostname: \"\($0.hostname)\",
+  password: \"\($0.password)\",
+  port: \"\($0.port)\",
+  user: \"\($0.user)\"
   )
   """
 }
 
-let securePrettyWitness = prettyWitness.contramap(set(\.password, "******"))
+let securePrettyWitness = prettyWitness.contramap { (conn: PostgresConnInfo) -> PostgresConnInfo in
+  return PostgresConnInfo(database: conn.database, hostname: conn.hostname, password: "******", port: conn.port, user: conn.user)
+}
 
 prettyWitness.describe(localhostPostgres)
 print(securePrettyWitness.describe(localhostPostgres))
@@ -232,3 +234,135 @@ let one = EmptyInitializing<Int> { 1 }
 //    return self * other
 //  }
 //}
+
+/*:
+ 1. Translate the Equatable protocol into an explicit datatype struct Equating.
+ */
+
+struct Equating<A> {
+  let isEqual: (A, A) -> Bool
+}
+
+let equate1 = Equating<Int>(isEqual: ==)
+
+/*:
+ 2. Currently in Swift (as of 4.2) there is no way to extend tuples to conform to protocols. Tuples are what is known as “non-nominal”, which means they behave differently from the types that you can define. For example, one cannot make tuples Equatable by implementing extension (A, B): Equatable where A: Equatable, B: Equatable. To get around this Swift implements overloads of == for tuples, but they aren’t truly equatable, i.e. you cannot pass a tuple of equatable values to a function wanting an equatable value.
+
+ However, protocol witnesses have no such problem! Demonstrate this by implementing the function pair: (Combining<A>, Combining<B>) -> Combining<(A, B)>. This function allows you to construct a combining witness for a tuple given two combining witnesses for each component of the tuple.
+ */
+
+func pair<A, B>(_ a: Combining<A>, b: Combining<B>) -> Combining<(A, B)> {
+  return Combining<(A, B)> { lhs, rhs in
+    let newA = a.combine(lhs.0, rhs.0)
+    let newB = b.combine(lhs.1, rhs.1)
+    return (newA, newB)
+  }
+}
+
+/*:
+ 3. Functions in Swift are also “non-nominal” types, which means you cannot extend them to conform to protocols. However, again, protocol witnesses have no such problem! Demonstrate this by implementing the function pointwise: (Combining<B>) -> Combining<(A) -> B>. This allows you to construct a combining witness for a function given a combining witnesss for the type you are mapping into. There is exactly one way to implement this function.
+ */
+
+func pointwise<A, B>(_ value: Combining<B>) -> Combining<(A) -> B> {
+  return Combining<(A) -> B> { lhs, rhs in
+    return { a in
+      value.combine(lhs(a), rhs(a))
+    }
+  }
+}
+
+/*:
+ 4. One of Swift’s most requested features was “conditional conformance”, which is what allows you to express, for example, the idea that an array of equatable values should be equatable. In Swift it is written extension Array: Equatable where Element: Equatable. It took Swift nearly 4 years after its launch to provide this capability!
+
+ So, then it may come as a surprise to you to know that “conditional conformance” was supported for protocol witnesses since the very first day Swift launched! All you need is generics. Demonstrate this by implementing a function array: (Combining<A>) -> Combining<[A]>. This is saying that conditional conformance in Swift is nothing more than a function between protocol witnesses.
+ */
+
+func array<A>(_ value: Combining<A>) -> Combining<[A]> {
+  return Combining { lhs, rhs in
+    fatalError() // add all elements/just concat array/zip ???
+  }
+}
+
+/*:
+ 5.Currently all of our witness values are just floating around in Swift, which may make some feel uncomfortable. There’s a very easy solution: implement witness values as static computed variables on the datatype! Try this by moving a few of the witnesses from the episode to be static variables. Also try moving the pair, pointwise and array functions to be static functions on the Combining datatype.
+ */
+
+extension PostgresConnInfo {
+  static var prettyWitness: Describing<PostgresConnInfo> {
+    return Describing<PostgresConnInfo> {
+      """
+      PostgresConnInfo(
+      database: \"\($0.database)\",
+      hostname: \"\($0.hostname)\",
+      password: \"\($0.password)\",
+      port: \"\($0.port)\",
+      user: \"\($0.user)\"
+      )
+      """
+    }
+  }
+}
+
+extension Combining {
+  func pair<B>(_ b: Combining<B>) -> Combining<(A, B)> {
+    return Combining<(A, B)> { (lhs, rhs) in
+      return (self.combine(lhs.0, rhs.0), b.combine(lhs.1, rhs.1))
+    }
+  }
+
+//  func pointwise<B>() -> Combining<(A) -> B> {
+//    return Combining<(A) -> B> { (lhs: (A) -> B, rhs: (A) -> B) in
+//      return { a in
+//        self.combine(lhs(a), rhs(a))
+//      }
+//    }
+//  }
+}
+
+/*:
+ 6.Protocols in Swift can have “associated types”, which are types specified in the body of a protocol but aren’t determined until a type conforms to the protocol. How does this translate to an explicit datatype to represent the protocol?
+ */
+
+// Another Generic
+
+/*:
+ 7. Translate the RawRepresentable protocol into an explicit datatype struct RawRepresenting. You will need to use the previous exercise to do this.
+ */
+
+struct RawRepresenting<A, RawValue> {
+  let representing: (A) -> RawValue?
+}
+
+enum Test6: String {
+  case first
+}
+
+RawRepresenting<String, Test6> { Test6(rawValue: $0) }
+
+/*
+ 8. Protocols can inherit from other protocols, for example the Comparable protocol inherits from the Equatable protocol. How does this translate to an explicit datatype to represent the protocol?
+ */
+
+// Below
+
+/*:
+ 9. Translate the Comparable protocol into an explicit datatype struct Comparing. You will need to use the previous exercise to do this.
+ */
+
+struct Comparing<A> {
+  let equate: Equating<A>
+
+  let less: (A, A) -> Bool
+}
+
+/*:
+ 10. We can combine the best of both worlds by using witnesses and having our default protocol, too. Define a DefaultDescribable protocol which provides a static member that returns a default witness of Describing<Self>. Using this protocol, define an overload of print(tag:) that doesn’t require a witness.
+ */
+
+protocol DefaultDescribable {
+  static var describe: Describing<Self> { get }
+}
+
+func print<A: DefaultDescribable>(tag: String, _ value: A) {
+  print("[\(tag)] \(A.describe.describe(value))") // naming xD
+}

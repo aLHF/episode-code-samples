@@ -9,6 +9,24 @@ struct Diffing<A> {
 
 struct Parallel<A> {
   let run: (@escaping (A) -> Void) -> Void
+
+  func map<B>(_ f: (A) -> B) -> Parallel<B> {
+    return Parallel<B> { callback in
+      self.run { a in
+        callback(f(a))
+      }
+    }
+  }
+
+  func flatMap<B>(_ f: (A) -> Parallel<B>) -> Parallel<B> {
+    return Parallel<B> { callback in
+      self.run { a in
+        f(a).run { b in
+          callback(b)
+        }
+      }
+    }
+  }
 }
 
 struct Snapshotting<A, Snapshot> {
@@ -30,20 +48,32 @@ struct Snapshotting<A, Snapshot> {
       pathExtension: self.pathExtension,
       snapshot: { (a0) -> Parallel<Snapshot> in
         return Parallel<Snapshot> { callback in
-//          callback // (Snapshot) -> Void
 //          a0 // A0
 //          f // (A0) -> Parallel<A>
 //          self.snapshot // (A) -> Parallel<Snapshot>
+//          callback // (Snapshot) -> Void
+
           let parallelA = f(a0)
-          parallelA.run { a in
-            let parallelSnapshot = self.snapshot(a)
-            parallelSnapshot.run { snapshot in
-              callback(snapshot)
-            }
-          }
+
+          parallelA.flatMap { self.snapshot($0) }.run { callback($0) }
+
+//          parallelA.run { a in
+//            let parallelSnapshot = self.snapshot(a)
+//            parallelSnapshot.run { snapshot in
+//              callback(snapshot)
+//            }
+//          }
         }
     }
     )
+  }
+
+  func redefinedPullback<A0>(_ f: @escaping (A0) -> A) -> Snapshotting<A0, Snapshot> {
+    return asyncPullback { a0 in
+      return Parallel<A> { callback in
+        callback(f(a0))
+      }
+    }
   }
 }
 

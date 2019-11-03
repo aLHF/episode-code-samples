@@ -127,23 +127,133 @@ let eastWest = Parser<Double> { str in
   return cardinal == "E" ? 1 : -1
 }
 
-func parseLatLong(_ str: String) -> Coordinate? {
-  var str = str[...]
+//func parseLatLong(_ str: String) -> Coordinate? {
+//  var str = str[...]
+//
+//  guard
+//    let lat = double.run(&str),
+//    literal("° ").run(&str) != nil,
+//    let latSign = northSouth.run(&str),
+//    literal(", ").run(&str) != nil,
+//    let long = double.run(&str),
+//    literal("° ").run(&str) != nil,
+//    let longSign = eastWest.run(&str)
+//    else { return nil }
+//
+//  return Coordinate(
+//    latitude: lat * latSign,
+//    longitude: long * longSign
+//  )
+//}
 
-  guard
-    let lat = double.run(&str),
-    literal("° ").run(&str) != nil,
-    let latSign = northSouth.run(&str),
-    literal(", ").run(&str) != nil,
-    let long = double.run(&str),
-    literal("° ").run(&str) != nil,
-    let longSign = eastWest.run(&str)
-    else { return nil }
+//print(String(describing: parseLatLong("40.6782° N, 73.9442° W")))
 
-  return Coordinate(
-    latitude: lat * latSign,
-    longitude: long * longSign
-  )
+/*
+ 1. Generalize the char parser created in this episode by turning it into a function func char: (CharacterSet) -> Parser<Character>. Use this parser to implement the northSouth and eastWest parsers without needing to use flatMap.
+ */
+
+func char(_ set: CharacterSet) -> Parser<Character> {
+  return Parser<Character> { str in
+    let first = str.first
+    guard let char = first, set.isSuperset(of: CharacterSet(char.unicodeScalars)) else { return nil }
+    return str.popFirst()
+  }
 }
 
-print(String(describing: parseLatLong("40.6782° N, 73.9442° W")))
+char(["a"]).run("fasdj")
+
+let northSouth1 = char(["N", "S"])
+  .map { $0 == "N" ? 1 : -1 }
+  .run("N")
+
+let eastWest1 = char(["E", "W"])
+  .map { $0 == "E" ? 1 : -1 }
+  .run("W")
+
+/*
+ 2. Define zip and flatMap on the Parser type. Start by defining what their signatures should be, and then figure out how to implement them in the simplest way possible. What gotcha to be on the look out for is that you do not want to consume any of the input string if the parser fails.
+ */
+
+extension Parser {
+  func flatMap<B>(_ t: @escaping (A) -> Parser<B>) -> Parser<B> {
+    return Parser<B> { str in
+      let original = str
+      let a = self.run(&str)
+
+      guard
+        let valueA = a, let valueB = t(valueA).run(&str)
+        else
+      {
+        str = original
+        return nil
+      }
+
+      return valueB
+    }
+  }
+
+  func zip<B>(_ pa: Parser<A>, _ pb: Parser<B>) -> Parser<(A, B)> {
+    return Parser<(A, B)> { str in
+      let original = str
+
+      guard
+        let valueA = pa.run(&str),
+        let valueB = pb.run(&str)
+        else
+      {
+        str = original
+        return nil
+      }
+
+      return (valueA, valueB)
+    }
+  }
+}
+
+/*
+ 3. Use the flatMap defined in the previous exercise to implement the northSouth and eastWest parsers. You will need to use the always and never parsers in their implementations.
+ */
+
+let northSouth3 = char(["N", "S"])
+  .flatMap { $0 == "N" ? always(1) : always(-1) }
+
+northSouth3.run("N")
+northSouth3.run("S")
+northSouth3.run("Z")
+
+let eastWest3 = char(["E", "W"])
+  .flatMap { $0 == "E" ? always(1) : always(-1) }
+
+eastWest3.run("E")
+eastWest3.run("W")
+eastWest3.run("Q")
+
+/*
+ 4. Using only map and flatMap, construct a parser for parsing a Coordinate value from the string "40.446° N, 79.982° W".
+ */
+
+dump(
+  double
+    .flatMap { lat in
+      literal("° ")
+        .flatMap { _ in
+          northSouth3
+            .flatMap { latSign in
+              literal(", ")
+                .flatMap { _ in
+                  double
+                    .flatMap { long in
+                      literal("° ")
+                        .flatMap { _ in
+                          eastWest
+                            .map { longSign in
+                              return Coordinate(latitude: lat * Double(latSign), longitude: long * Double(longSign))
+                          }
+                      }
+                  }
+              }
+          }
+      }
+    }
+    .run("40.446° N, 79.982° W")
+)

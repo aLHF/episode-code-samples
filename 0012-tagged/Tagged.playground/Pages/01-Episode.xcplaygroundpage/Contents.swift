@@ -23,6 +23,15 @@ let usersJson = """
 ]
 """
 
+let subscriptionsJson = """
+[
+  {
+    "id": 1,
+    "ownerId": 1
+  }
+]
+"""
+
 struct Tagged<Tag, RawValue> {
   let rawValue: RawValue
 }
@@ -38,75 +47,41 @@ extension Tagged: Equatable where RawValue: Equatable {
   static func == (lhs: Tagged<Tag, RawValue>, rhs: Tagged<Tag, RawValue>) -> Bool {
     return lhs.rawValue == rhs.rawValue
   }
-
 }
-
-//struct Email: Decodable, RawRepresentable { let rawValue: String }
-// {"email": String}
 
 enum EmailTag {}
 typealias Email = Tagged<EmailTag, String>
-
-//newtype Email = String
-
-struct Subscription: Decodable {
-  //  struct Id: Decodable, RawRepresentable, Equatable { let rawValue: Int }
-  typealias Id = Tagged<Subscription, Int>
-
-  let id: Id
-  let ownerId: User.Id
-}
+// newtype Email = String
 
 struct User: Decodable {
-  //  struct Id: Decodable, RawRepresentable { let rawValue: Int }
-  typealias Id = Tagged<User, Int>
+  typealias ID = Tagged<User, Int>
 
-  let id: Id
+  let id: ID
   let name: String
   let email: Email
-  let subscriptionId: Subscription.Id?
+  let subscriptionId: Subscription.ID?
 }
 
-//{
-//  "id": 3,
-//  "name": "Blob",
-//  "email": {"email": "blob@pointfree.co"},
-//  "subscriptionId": 1
-//}
+struct Subscription: Decodable {
+  typealias ID = Tagged<Subscription, Int>
 
-User.init(from:)
-
-
-let subscriptionsJson = """
-[
-{
-"id": 1,
-"ownerId": 1
+  let id: ID
+  let ownerId: User.ID
 }
-]
-"""
-
-
 
 let decoder = JSONDecoder()
-
 let users = try! decoder.decode([User].self, from: Data(usersJson.utf8))
-
 let subscriptions = try! decoder.decode([Subscription].self, from: Data(subscriptionsJson.utf8))
 
-
-func sendEmail(email: Email) {
+func sendEmai(email: Email) {
   //
 }
 
-typealias _Email = String
-
 let user = users[0]
-sendEmail(email: user.email)
-//sendEmail(email: user.name)
+sendEmai(email: user.email)
+//sendEmai(email: user.name)
 
-//RawRepresentable
-
+// RawRepresentable
 
 enum Status: Int {
   case ok = 200
@@ -115,30 +90,50 @@ enum Status: Int {
 
 Status.ok.rawValue
 Status.init(rawValue: 200)
-Status.init(rawValue: 600)
-
+Status.init(rawValue: 201)
 
 subscriptions
-  .first { $0.id == user.subscriptionId }
-
+  .first(where: { $0.id == user.subscriptionId })
 //subscriptions
-//  .first { $0.id == user.id }
+//  .first(where: { $0.id == user.id })
+
+User(
+  id: .init(rawValue: 1),
+  name: "Jack",
+  email: .init(rawValue: "jack85@gmai.com"),
+  subscriptionId: .init(rawValue: 2)
+)
 
 extension Tagged: ExpressibleByIntegerLiteral where RawValue: ExpressibleByIntegerLiteral {
+  typealias IntegerLiteralType = RawValue.IntegerLiteralType
 
   init(integerLiteral value: RawValue.IntegerLiteralType) {
     self.init(rawValue: RawValue(integerLiteral: value))
   }
-
-  typealias IntegerLiteralType = RawValue.IntegerLiteralType
-
-
 }
 
 User(
   id: 1,
-  name: "Blob",
-  email: .init(rawValue: "blob@pointfree.co"),
-  subscriptionId: .init(rawValue: 2)
+  name: "Jack",
+  email: .init(rawValue: "jack85@gmai.com"),
+  subscriptionId: 2
 )
+
+//extension Tagged: ExpressibleByIntegerLiteral where RawValue: ExpressibleByIntegerLiteral {
+//
+//  init(integerLiteral value: RawValue.IntegerLiteralType) {
+//    self.init(rawValue: RawValue(integerLiteral: value))
+//  }
+//
+//  typealias IntegerLiteralType = RawValue.IntegerLiteralType
+//
+//
+//}
+//
+//User(
+//  id: 1,
+//  name: "Blob",
+//  email: .init(rawValue: "blob@pointfree.co"),
+//  subscriptionId: .init(rawValue: 2)
+//)
 //: [See the next page](@next) for exercises!

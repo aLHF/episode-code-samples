@@ -32,10 +32,10 @@ extension NonEmptyArray: CustomStringConvertible {
 NonEmptyArray(head: 1, tail: [2, 3])
 
 extension NonEmptyArray {
-//  init(_ head: A, _ tail: [A] = []) {
-//    self.head = head
-//    self.tail = tail
-//  }
+  //  init(_ head: A, _ tail: [A] = []) {
+  //    self.head = head
+  //    self.tail = tail
+  //  }
   init(_ head: A, _ tail: A...) {
     self.head = head
     self.tail = tail
@@ -71,13 +71,12 @@ xs.forEach { print($0) }
 xs.count
 xs.first
 
+
 extension NonEmptyArray {
   var first: A {
     return self.head
   }
 }
-
-xs.first + 1
 
 extension NonEmptyArray: BidirectionalCollection {
   func index(before i: Int) -> Int {
@@ -364,3 +363,150 @@ enum Validated<Value, Error> {
 let validatedPassword = Validated<String, String>.invalid(.init("Too short", "Didn't contain any numbers"))
 
 //let validatedPassword = Validated<String, String>.invalid([])
+
+
+// MARK: - Homework
+
+// #1. Why shouldn’t NonEmpty conditionally conform to SetAlgebra when its underlying collection type also conforms to SetAlgebra?
+
+/*
+ - It has an empty initializer
+ - It has methods which can return an empty collection (e.g. intersection, symmetricDifference etc)
+ - It has methods for removel of elements which can lead to the empty collection
+ */
+
+// #2.
+extension NonEmpty where C: SetAlgebra {
+  func contains(_ member: C.Element) -> Bool {
+    var set = self.tail
+    set.insert(self.head)
+    return set.contains(member)
+  }
+}
+
+// #3.
+extension NonEmpty where C: SetAlgebra {
+  func union(_ other: NonEmpty) -> NonEmpty {
+    var lhs = self.tail
+    lhs.insert(self.head)
+    var rhs = other.tail
+    rhs.insert(other.head)
+
+    var set = lhs.union(rhs)
+
+    guard let head = set.first else { fatalError("not possible") }
+
+    set.remove(head)
+    return NonEmpty(head, set)
+  }
+}
+
+NonEmptySet(1, 2, 3).union(NonEmptySet(3, 2, 1)).count == 3
+
+// #4.
+protocol DictionaryProtocol: Collection where Element == (key: Key, value: Value) {
+  associatedtype Key: Hashable
+  associatedtype Value
+
+  var keys: Dictionary<Key, Value>.Keys { get }
+
+  mutating func updateValue(_ value: Value, forKey key: Key) -> Value?
+  mutating func merge(_ other: [Key: Value], uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows
+
+  subscript(key: Key) -> Value? { get }
+}
+
+extension Dictionary: DictionaryProtocol {}
+
+extension NonEmpty where C: DictionaryProtocol {
+  subscript(key: C.Key) -> C.Value? {
+    return self.head.key == key ? self.head.value : self.tail[key]
+  }
+}
+
+NonEmpty<[Int: Int]>((1, 1), [2: 2, 3: 3])[3]
+
+// #5.
+extension NonEmpty where C: DictionaryProtocol {
+  init(_ head: C.Element, _ tail: C) {
+    guard !tail.keys.contains(head.key) else {
+      fatalError("Tail contains the same key as the head.")
+    }
+
+    self.head = head
+    self.tail = tail
+  }
+}
+
+// #6.
+extension NonEmpty where C: DictionaryProtocol {
+  mutating func update(_ value: C.Value, forKey key: C.Key) -> C.Value? {
+    if head.key == key {
+      let oldValue = head.value
+      self.head.value = value
+      return oldValue
+    } else {
+      return self.tail.updateValue(value, forKey: key)
+    }
+  }
+}
+
+var emptyDictionaty6 = NonEmpty<[Int: Int]>((1, 1), [2: 2, 3: 3])
+emptyDictionaty6.tail[1] = 5
+emptyDictionaty6
+
+// #7.
+extension NonEmpty where C: DictionaryProtocol {
+  mutating func merge(_ other: [C.Key: C.Value], uniquingKeysWith combine: (C.Value, C.Value) throws -> C.Value) rethrows {
+    var other = other
+
+    if let newValue = other.removeValue(forKey: self.head.key) {
+      self.head.value = try combine(self.head.value, newValue)
+    }
+
+    try self.tail.merge(other, uniquingKeysWith: combine)
+  }
+
+  func merging(_ other: [C.Key: C.Value], uniquingKeysWith combine: (C.Value, C.Value) throws -> C.Value) rethrows -> NonEmpty {
+    var result = self
+    try result.merge(other, uniquingKeysWith: combine)
+    return result
+  }
+}
+
+// #8.
+extension NonEmpty {
+  func joined<Separator: Sequence, T: RangeReplaceableCollection>(separator: Separator) -> NonEmpty<T> where Element == NonEmpty<T>, Separator.Element == T.Element {
+    let head = self.head.head
+    let tail = self.head.tail + T(separator) + T(self.tail.joined(separator: separator))
+
+    return NonEmpty<T>(head, tail)
+  }
+}
+
+// #9.Ø
+
+// #10.
+// Both wrapped collection and it's element type should be equatable
+extension NonEmpty: Equatable where C: Equatable, C.Element: Equatable {
+  static func == (lhs: NonEmpty, rhs: NonEmpty) -> Bool {
+    return lhs.head == rhs.head && lhs.tail == rhs.tail
+  }
+}
+
+// #11.
+extension NonEmpty {
+  static func zip<A, B>(_ a: NonEmpty<[A]>, _ b: NonEmpty<[B]>) -> NonEmpty<[(A, B)]> {
+    let head = (a.head, b.head)
+    let tail = Array(Swift.zip(a.tail, b.tail))
+    return NonEmpty<[(A, B)]>(head, tail)
+  }
+}
+
+func zip<A, B>(_ a: NonEmpty<[A]>, _ b: NonEmpty<[B]>) -> NonEmpty<[(A, B)]> {
+  let head = (a.head, b.head)
+  let tail = Array(zip(a.tail, b.tail))
+  return NonEmpty<[(A, B)]>(head, tail)
+}
+
+

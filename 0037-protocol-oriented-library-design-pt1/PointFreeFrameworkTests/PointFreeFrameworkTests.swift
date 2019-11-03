@@ -9,32 +9,28 @@ class PointFreeFrameworkTests: SnapshotTestCase {
   }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 protocol Snapshottable {
   associatedtype Snapshot: Diffable
   var snapshot: Snapshot { get }
+  var pathExtension: String { get }
+}
+
+extension Snapshottable {
+  var pathExtension: String { return "png" }
 }
 
 protocol Diffable {
   static func diff(old: Self, new: Self) -> [XCTAttachment]
   static func from(data: Data) -> Self
   var data: Data { get }
+  //  var pathExtension: String { get } // Why not to put pathExtension requirement to Diffable protocol. Reasoning: snapshotabble can return different data types (e.g. image or text) which need different path extensions
 }
 
 extension UIImage: Diffable {
+//  var pathExtension: String {
+//    return "png"
+//  }
+
   var data: Data {
     return self.pngData()!
   }
@@ -47,6 +43,7 @@ extension UIImage: Diffable {
     guard let difference = Diff.images(old, new) else { return [] }
     return [old, new, difference].map(XCTAttachment.init(image:))
   }
+
 }
 
 extension UIImage: Snapshottable {
@@ -85,7 +82,7 @@ class SnapshotTestCase: XCTestCase {
 
     let snapshot = value.snapshot
     let referenceUrl = snapshotUrl(file: file, function: function)
-      .appendingPathExtension("png")
+      .appendingPathExtension(value.pathExtension)
 
     if !self.record, let referenceData = try? Data(contentsOf: referenceUrl) {
       let reference = S.Snapshot.from(data: referenceData)

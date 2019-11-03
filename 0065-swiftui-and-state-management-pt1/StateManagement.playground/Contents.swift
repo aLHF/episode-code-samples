@@ -3,7 +3,7 @@ import SwiftUI
 
 struct ContentView: View {
   @ObservedObject var state: AppState
-
+  
   var body: some View {
     NavigationView {
       List {
@@ -33,36 +33,19 @@ class AppState: ObservableObject {
   @Published var count = 0
 }
 
-struct CounterView: View {
-  @ObservedObject var state: AppState
 
+
+struct IsPrimeModalView: View {
+  @ObservedObject var state: AppState
+  
   var body: some View {
-    VStack {
-      HStack {
-        Button(action: { self.state.count -= 1 }) {
-          Text("-")
-        }
-        Text("\(self.state.count)")
-        Button(action: { self.state.count += 1 }) {
-          Text("+")
-        }
-      }
-      Button(action: {}) {
-        Text("Is this prime?")
-      }
-      Button(action: {}) {
-        Text("What is the \(ordinal(self.state.count)) prime?")
-      }
-    }
-    .font(.title)
-    .navigationBarTitle("Counter demo")
+    Text("I don't know if \(self.state.count) is a prime.")
   }
 }
-
 
 import PlaygroundSupport
 
 PlaygroundPage.current.liveView = UIHostingController(
   rootView: ContentView(state: AppState())
-//  rootView: CounterView()
+  //  rootView: CounterView()
 )

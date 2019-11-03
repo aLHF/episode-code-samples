@@ -5,6 +5,7 @@ import SwiftUI
 public enum CounterAction {
   case decrTapped
   case incrTapped
+  case counterTextFieldChanged(String)
 }
 
 public func counterReducer(state: inout Int, action: CounterAction) {
@@ -14,6 +15,9 @@ public func counterReducer(state: inout Int, action: CounterAction) {
 
   case .incrTapped:
     state += 1
+
+  case .counterTextFieldChanged(let stringNumber):
+    state = Int(stringNumber) ?? 0
   }
 }
 
@@ -74,6 +78,7 @@ public struct CounterView: View {
         Text("\(self.store.value.count)")
         Button("+") { self.store.send(.counter(.incrTapped)) }
       }
+      TextField("Enter Your Number", text: store.send({ .counter(.counterTextFieldChanged($0))  }, transform: { String($0.count) }))
       Button("Is this prime?") { self.isPrimeModalShown = true }
       Button(
         "What is the \(ordinal(self.store.value.count)) prime?",

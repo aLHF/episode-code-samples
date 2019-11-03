@@ -63,3 +63,20 @@ extension Snapshotting where A == WKWebView, Snapshot == UIImage {
 //      }
 //  }
 }
+
+extension Snapshotting where A == Any, Snapshot == String {
+  static let dump: Snapshotting = Snapshotting<String, String>.lines.pullback { (object: Any) in
+    var result = String()
+    dump(object, to: &result)
+    return result
+  }
+}
+
+extension Snapshotting where A == NSAttributedString, Snapshot == Image {
+  static let image: Snapshotting = Snapshotting<UIView, UIImage>.image.pullback { string
+    let label = UILabel()
+    label.attributedText = string
+    label.sizeToFit()
+    return label
+  }
+}

@@ -39,13 +39,16 @@
 
     What would it look like to define an `EnumKeyPath<Root, Value>` type that encapsulates the idea of “getting” and “setting” cases in an enum?
  */
-// TODO
+\String.count
+class EnumKeyPath<Root, Value> {
+  
+}
 /*:
  7. Given a value in `EnumKeyPath<A, B>` and `EnumKeyPath<B, C>`, can you construct a value in
  `EnumKeyPath<A, C>`?
  */
 // TODO
 /*:
- 8. Given a value in `EnumKeyPath<A, B>` and a value in `EnumKeyPath<A, C>`, can you construct a value in `EnumKeyPath<A, Either<B, C>>`?
+ 8. Given a value in `EnumKeyPath<A, C>` and a value in `EnumKeyPath<B, C>`, can you construct a value in `EnumKeyPath<Either<A, B>, C>`?
  */
 // TODO

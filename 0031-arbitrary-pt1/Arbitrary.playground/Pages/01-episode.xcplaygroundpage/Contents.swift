@@ -9,7 +9,6 @@ struct ArbitraryDecoder: Decoder {
   var userInfo: [CodingUserInfoKey: Any] = [:]
 
   func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key : CodingKey {
-
     return KeyedDecodingContainer(KeyedContainer())
   }
 
@@ -17,8 +16,15 @@ struct ArbitraryDecoder: Decoder {
     var codingPath: [CodingKey] = []
     var allKeys: [Key] = []
 
+    init() {
+
+      self.allKeys = Array(repeating: (), count: Int.random(in: 0 ... 100))
+        .map { Int.random(in: 0 ... .max) }
+        .compactMap { Key(intValue: $0) }
+    }
+
     func contains(_ key: Key) -> Bool {
-      fatalError()
+      return allKeys.contains(where: { $0.intValue == key.intValue })
     }
 
     func decodeNil(forKey key: Key) throws -> Bool {
@@ -44,14 +50,48 @@ struct ArbitraryDecoder: Decoder {
     func superDecoder(forKey key: Key) throws -> Decoder {
       fatalError()
     }
-
-
-
-
   }
 
   func unkeyedContainer() throws -> UnkeyedDecodingContainer {
-    fatalError()
+    return UnkeyedContainer()
+  }
+
+  struct UnkeyedContainer: UnkeyedDecodingContainer {
+    var codingPath: [CodingKey] = []
+    var count: Int? = Int.random(in: 1 ... 10)
+    var isAtEnd: Bool { return currentIndex == endIndex }
+    var currentIndex: Int = 0
+
+    private var endIndex: Int {
+      if let count = count {
+        return max(count - 1, 0)
+      } else {
+        return 0
+      }
+    }
+
+    mutating func decodeNil() throws -> Bool {
+      fatalError()
+    }
+
+    mutating func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
+      self.currentIndex += 1
+      return try T(from: ArbitraryDecoder())
+    }
+
+    mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {
+      fatalError()
+    }
+
+    mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer {
+      fatalError()
+    }
+
+    mutating func superDecoder() throws -> Decoder {
+      print("super")
+      self.currentIndex += 1
+      fatalError()
+    }
   }
 
   func singleValueContainer() throws -> SingleValueDecodingContainer {
@@ -181,3 +221,28 @@ print(try User(from: ArbitraryDecoder()))
 print(try User(from: ArbitraryDecoder()))
 print(try User(from: ArbitraryDecoder()))
 print(try User(from: ArbitraryDecoder()))
+
+
+/*:
+ 1. We skipped over the allKeys property of the KeyedDecodingContainerProtocol, but it’s what’s necessary to decode dictionaries of values. On initialization of the KeyedDecodingContainer, generate a random number of random CodingKeys to populate this property.
+
+ You’ll need to return true from contains(_ key: Key).
+
+ Decode a few random dictionaries of various decodable keys and values. What are some of the limitations of decoding dictionaries?
+ */
+
+// We need to specify Key and Value types.
+print(try Dictionary<Int, User>(from: ArbitraryDecoder()))
+
+/*:
+ 2. Create a new UnkeyedContainer struct that conforms to the UnkeyedContainerProtocol and return it from the unkeyedContainer() method of ArbitraryDecoder. As with the KeyedDecodingContainer, you can delete the same decode methods and have them delegate to the SingleValueContainer.
+
+ The count property can be used to generate a randomly-sized container, while currentIndex and isAtEnd can be used to let the decoder know how far along it is. Generate a random count, default the currentIndex to 0, and define isAtEnd as a computed property using these values. The currentIndex property should increment whenever superDecoder is called.
+
+ Decode a few random arrays of various decodable elements.
+ */
+print("2) Arrays")
+print(try Array<User>(from: ArbitraryDecoder()))
+print(try Array<String>(from: ArbitraryDecoder()))
+print(try Array<Double>(from: ArbitraryDecoder()))
+print(try Array<Bool>(from: ArbitraryDecoder()))

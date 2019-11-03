@@ -171,8 +171,6 @@ try Date(from: ArbitraryDecoder())
 try Date(from: ArbitraryDecoder())
 //try UUID(from: ArbitraryDecoder())
 
-import Tagged
-
 struct User: Decodable {
   typealias Id = Tagged<User, UUID>
 
@@ -192,7 +190,8 @@ struct Gen<A> {
 }
 
 import Darwin
-let random = Gen(run: arc4random)
+
+let random = Gen(run: { UInt64.random(in: .min ... .max) })
 
 extension Gen {
   func map<B>(_ f: @escaping (A) -> B) -> Gen<B> {
@@ -200,11 +199,7 @@ extension Gen {
   }
 }
 
-let uint64 = Gen<UInt64> {
-  let lower = UInt64(random.run())
-  let upper = UInt64(random.run()) << 32
-  return lower + upper
-}
+let uint64 = random
 
 func int(in range: ClosedRange<Int>) -> Gen<Int> {
   return Gen<Int> {
@@ -333,3 +328,87 @@ print(randomUser.run())
 print(randomUser.run())
 print(randomUser.run())
 print(randomUser.run())
+
+
+/*:
+ 1. Redefine Gen‘s base unit of randomness, random, which is a Gen<UInt32> to work with Swift 4.2’s base unit of randomness, the RandomNumberGenerator protocol. The base random type should should change to UInt64.
+ */
+
+// Done
+
+/*:
+ 2. Swift 4.2’s protocol-oriented solution allows us to define custom types that conform to RandomNumberGenerator. Update Gen to evaluate given any RandomNumberGenerator by changing run’s signature.
+ */
+struct Gen2 {
+  var run: (RandomNumberGenerator) -> UInt64
+}
+
+struct CustomGen: RandomNumberGenerator {
+  var run: () -> UInt64
+
+  mutating func next() -> UInt64 {
+    return run()
+  }
+}
+
+//extension Gen: RandomNumberGenerator where A == UInt64 {}
+
+let gen2 = Gen2.init(run: { generator in
+  var generator = generator
+  return generator.next()
+})
+
+let gen2Value = gen2
+  .run(CustomGen { UInt64.random(in: .min ... .max) })
+
+/*:
+ 3. Use a custom random number generator that can be configured with a stable seed to allow for the Gen type to predictably generate the same random value for a given seed.
+
+ You can look to Nate Cook’s playground, shared on the Swift forums, or (for bonus points), you can define your own linear congruential generator (or LCG).
+ */
+
+
+struct LCGGenerator: RandomNumberGenerator {
+  private var seed: UInt64
+  private let multiplier: UInt64 = 1103515245
+  private let increment: UInt64 = 12345
+  private let modulus: UInt64 = UInt64(pow(Double(2),Double(31)))
+
+  init(seed: UInt64) {
+    self.seed = seed
+    print("modi: \(modulus)")
+  }
+
+  mutating func next() -> UInt64 {
+    seed = (multiplier * seed + increment) % modulus
+    return seed
+  }
+}
+
+
+
+/*:
+ 4. Write a helper that runs a property test for XCTest! A property test, given a generator and a block of code, will evaluate the block of code with a configurable number of random runs. If the block returns true, the property test passes. It it returns false, it fails. The signature should be the following.
+
+ func forAll<A>(_ a: Gen<A>, propertyShouldHold: (A) -> Bool)
+ It should, internally, call an XCTAssert function. Upon failure, print out the seed so that it can be reproduced.
+ */
+import XCTest
+
+func forAll<A>(_ a: Gen<A>, propertyShouldHold: (A) -> Bool, file: StaticString = #file, line: UInt = #line) {
+  for i in 1...100 {
+    print("i: \(i)")
+    let randomValue = a.run()
+    let shouldHold = propertyShouldHold(randomValue)
+    XCTAssert(shouldHold, file: file, line: line)
+    XCTAssert(shouldHold)
+  }
+}
+
+var aaaa = 0
+forAll(random, propertyShouldHold: { _ in
+  aaaa += 1
+  if aaaa > 50 {  return false }
+
+  return true
+})

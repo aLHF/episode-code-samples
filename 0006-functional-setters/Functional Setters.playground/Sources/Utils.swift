@@ -11,12 +11,25 @@ precedencegroup ForwardComposition {
 
 infix operator >>>: ForwardComposition
 
+precedencegroup BackwardComposition {
+  associativity: left
+  higherThan: ForwardApplication
+}
+
+infix operator <<<: BackwardComposition
+
 public func |> <A, B>(x: A, f: (A) -> B) -> B {
   return f(x)
 }
 
 public func >>> <A, B, C>(f: @escaping (A) -> B, g: @escaping (B) -> C) -> (A) -> C {
   return { g(f($0)) }
+}
+
+public func <<< <A, B, C>(_ f: @escaping (B) -> C, g: @escaping (A) -> B) -> (A) -> C {
+  return { a in
+    return f(g(a))
+  }
 }
 
 public func zurry<A>(_ f: () -> A) -> A {

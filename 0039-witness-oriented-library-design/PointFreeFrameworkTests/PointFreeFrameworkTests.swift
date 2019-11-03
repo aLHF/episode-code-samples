@@ -244,6 +244,16 @@ extension Snapshotting where A == UIViewController, Snapshot == String {
   static let recursiveDescription: Snapshotting = Snapshotting<UIView, String>.recursiveDescription.pullback(get(\.view))
 }
 
+extension Snapshotting where A == Any, Snapshot == String {
+  static let dump: Snapshotting = Snapshotting<Any, String>(
+    diffing: .lines,
+    pathExtension: "txt") { object -> String in
+      let see == dump(object)
+
+      return ""
+  }
+}
+
 extension UIImage: Snapshottable {
   var snapshot: UIImage {
     return self

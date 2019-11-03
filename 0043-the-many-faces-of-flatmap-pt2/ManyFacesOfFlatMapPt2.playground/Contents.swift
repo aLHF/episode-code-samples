@@ -133,11 +133,12 @@ enum Result<A, E> {
     }
   }
 
-  public func flatMap<B>(_ transform: (A) -> Result<B, E>) -> Result<B, E> {
+  func flatMap<B>(_ f: @escaping (A) -> Result<B, E>) -> Result<B, E> {
     switch self {
-    case let .success(value):
-      return transform(value)
-    case let .failure(error):
+    case .success(let value):
+      return f(value)
+
+    case .failure(let error):
       return .failure(error)
     }
   }
@@ -175,8 +176,35 @@ case let .failure(error):
   print(error)
 }
 
+// ==
+struct NonEmpty<C: Collection> {
+  typealias Element = C.Element
 
-import NonEmpty
+  internal(set) var head: Element
+  internal(set) var tail: C
+
+  init(_ head: Element, _ tail: C) {
+    self.head = head
+    self.tail = tail
+  }
+}
+
+extension NonEmpty: CustomStringConvertible {
+  public var description: String {
+    return "\(self.head)\(self.tail)"
+  }
+}
+
+extension NonEmpty: Equatable where C: Equatable, C.Element: Equatable {}
+
+extension NonEmpty: Hashable where C: Hashable, C.Element: Hashable {}
+
+extension NonEmpty: Decodable where C: Decodable, C.Element: Decodable {}
+
+extension NonEmpty: Encodable where C: Encodable, C.Element: Encodable {}
+
+typealias NonEmptyArray<Element> = NonEmpty<[Element]>
+// ===
 
 enum Validated<A, E> {
   case valid(A)
@@ -191,13 +219,13 @@ enum Validated<A, E> {
     }
   }
 
-
-  public func flatMap<B>(_ transform: (A) -> Validated<B, E>) -> Validated<B, E> {
+  func flatMap<B>(_ f: @escaping (A) -> Validated<B, E>) -> Validated<B, E> {
     switch self {
-    case let .valid(value):
-      return transform(value)
-    case let .invalid(error):
-      return .invalid(error)
+    case let .valid(a):
+      return f(a)
+
+    case let .invalid(e):
+      return .invalid(e)
     }
   }
 }
@@ -213,8 +241,11 @@ struct Func<A, B> {
   }
 
   func flatMap<C>(_ f: @escaping (B) -> Func<A, C>) -> Func<A, C> {
-    return Func<A, C> { a -> C in
-      f(self.run(a)).run(a)
+    return Func<A, C> { a in
+      let b = self.run(a)
+      let funcAC = f(b)
+      let c = funcAC.run(a)
+      return c //      f(self.run(a)).run(a)
     }
   }
 }
@@ -278,8 +309,9 @@ struct Parallel<A> {
         f(a).run(callback)
       }
     }
-  }
+  }                                                                    
 }
+
 
 
 func delay(by duration: TimeInterval, line: UInt = #line) -> Parallel<Void> {

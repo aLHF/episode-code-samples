@@ -70,3 +70,23 @@ public func second<A, B, C>(_ f: @escaping (B) -> C) -> ((A, B)) -> (A, C) {
 public func map<A, B>(_ f: @escaping (A) -> B) -> ([A]) -> [B] {
   return { $0.map(f) }
 }
+
+public func prop<Root, Value>(_ keyPath: WritableKeyPath<Root, Value>)
+  -> (@escaping (Value) -> Value)
+  -> (Root)
+  -> Root {
+
+    return { getValue in
+      return { root in
+        var root = root
+        root[keyPath: keyPath] = getValue(root[keyPath: keyPath])
+        return root
+      }
+    }
+}
+
+public func map<A, B>(_ f: @escaping (A) -> B) -> (A?) -> B? {
+  return { a in
+    a.map(f)
+  }
+}
