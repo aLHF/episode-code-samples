@@ -29,21 +29,13 @@ public func counterReducer(state: inout CounterState, action: CounterAction) -> 
   case .nthPrimeButtonTapped:
     state.isNthPrimeButtonDisabled = true
     let count = state.count
-    return [{ callback in
-      nthPrime(count) { prime in
-        DispatchQueue.main.async {
-          callback(.nthPrimeResponse(prime))
-        }
-      }
-//      var p: Int?
-//      let sema = DispatchSemaphore(value: 0)
-//      nthPrime(count) { prime in
-//        p = prime
-//        sema.signal()
-//      }
-//      sema.wait()
-//      return .nthPrimeResponse(p)
-    }]
+
+    let effect = Effect<Int?> { callback in nthPrime(count, callback: callback) }
+      .receive(on: .main)
+      .map { result -> CounterAction in .nthPrimeResponse(result) }
+
+
+    return [effect]
 
   case let .nthPrimeResponse(prime):
     state.alertNthPrime = prime.map(PrimeAlert.init(prime:))

@@ -71,35 +71,10 @@ extension AppState {
   }
 }
 
-let appReducer: (inout AppState, AppAction) -> Void = combine(
+let appReducer = combine(
   pullback(counterViewReducer, value: \.counterView, action: \.counterView),
   pullback(favoritePrimesReducer, value: \.favoritePrimes, action: \.favoritePrimes)
 )
-
-func activityFeed(
-  _ reducer: @escaping (inout AppState, AppAction) -> Void
-) -> (inout AppState, AppAction) -> Void {
-
-  return { state, action in
-    switch action {
-    case .counterView(.counter),
-         .favoritePrimes(.loadedFavoritePrimes):
-      break
-    case .counterView(.primeModal(.removeFavoritePrimeTapped)):
-      state.activityFeed.append(.init(timestamp: Date(), type: .removedFavoritePrime(state.count)))
-
-    case .counterView(.primeModal(.saveFavoritePrimeTapped)):
-      state.activityFeed.append(.init(timestamp: Date(), type: .addedFavoritePrime(state.count)))
-
-    case let .favoritePrimes(.deleteFavoritePrimes(indexSet)):
-      for index in indexSet {
-        state.activityFeed.append(.init(timestamp: Date(), type: .removedFavoritePrime(state.favoritePrimes[index])))
-      }
-    }
-
-    reducer(&state, action)
-  }
-}
 
 struct ContentView: View {
   @ObservedObject var store: Store<AppState, AppAction>
