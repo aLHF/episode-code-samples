@@ -12,6 +12,8 @@ struct Parallel<A> {
 
 //public typealias Effect<Action> = (@escaping (Action) -> Void) -> Void
 
+private var unfairLock = os_unfair_lock()
+private var isCancelled: [AnyHashable: DispatchWorkItem] = [:]
 
 public struct Effect<A> {
   public let run: (@escaping (A) -> Void) -> Void
@@ -22,6 +24,50 @@ public struct Effect<A> {
 
   public func map<B>(_ f: @escaping (A) -> B) -> Effect<B> {
     return Effect<B> { callback in self.run { a in callback(f(a)) } }
+  }
+
+  public func run(on queue: DispatchQueue) -> Effect {
+    return Effect { callback in queue.async { self.run { a in callback(a) } } }
+  }
+
+  public func cancellable(id: AnyHashable) -> Effect {
+    return Effect { callback in
+      let item = self.dispatchItem(callback: callback)
+      os_unfair_lock_lock(&unfairLock)
+      isCancelled[id] = item
+      os_unfair_lock_unlock(&unfairLock)
+      item.perform()
+    }
+  }
+
+  public static func cancel(id: AnyHashable) -> Effect {
+    return Effect { _ in
+      os_unfair_lock_lock(&unfairLock)
+      isCancelled[id]?.cancel()
+      os_unfair_lock_unlock(&unfairLock)
+    }
+  }
+
+  private func dispatchItem(callback: @escaping (A) -> Void) -> DispatchWorkItem {
+    return DispatchWorkItem { self.run { a in callback(a) } }
+  }
+
+  public func debounce<ID: Hashable>(for duration: TimeInterval, id: ID) -> Effect {
+    return Effect { callback in
+      let item = self.dispatchItem(callback: callback)
+
+      os_unfair_lock_lock(&unfairLock)
+      isCancelled[id]?.cancel()
+      isCancelled[id] = item
+      os_unfair_lock_unlock(&unfairLock)
+      DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: item)
+    }
+  }
+}
+
+extension Effect where A == Never {
+  func fireAndForget<B>() -> Effect<B> {
+    return Effect<B> { _ in self.run { _ in } }
   }
 }
 
@@ -117,17 +163,20 @@ public func pullback<LocalValue, GlobalValue, LocalAction, GlobalAction>(
   }
 }
 
+struct AnalyticsClient {
+  let track: (String) -> Effect<Never>
+}
+
+extension AnalyticsClient {
+  static let live: AnalyticsClient = AnalyticsClient(track: { event in Effect { _ in print(event) } })
+}
+
+
 public func logging<Value, Action>(
   _ reducer: @escaping Reducer<Value, Action>
 ) -> Reducer<Value, Action> {
   return { value, action in
     let effects = reducer(&value, action)
-    let newValue = value
-    return [Effect { _ in
-      print("Action: \(action)")
-      print("Value:")
-      dump(newValue)
-      print("---")
-    }] + effects
+    return [AnalyticsClient.live.track("-----\nAction: \(action)\n-----").fireAndForget()] + effects
   }
 }

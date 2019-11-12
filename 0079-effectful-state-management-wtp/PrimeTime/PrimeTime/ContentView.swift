@@ -11,6 +11,7 @@ struct AppState {
   var activityFeed: [Activity] = []
   var alertNthPrime: PrimeAlert? = nil
   var isNthPrimeButtonDisabled: Bool = false
+  var isPrime: Bool?
 
   struct Activity {
     let timestamp: Date
@@ -63,7 +64,8 @@ extension AppState {
         alertNthPrime: self.alertNthPrime,
         count: self.count,
         favoritePrimes: self.favoritePrimes,
-        isNthPrimeButtonDisabled: self.isNthPrimeButtonDisabled
+        isNthPrimeButtonDisabled: self.isNthPrimeButtonDisabled,
+        isPrime: self.isPrime
       )
     }
     set {
@@ -71,6 +73,7 @@ extension AppState {
       self.count = newValue.count
       self.favoritePrimes = newValue.favoritePrimes
       self.isNthPrimeButtonDisabled = newValue.isNthPrimeButtonDisabled
+      self.isPrime = newValue.isPrime
     }
   }
 }
@@ -89,7 +92,9 @@ func activityFeed(
     case .counterView(.counter),
          .favoritePrimes(.loadedFavoritePrimes),
          .favoritePrimes(.loadButtonTapped),
-         .favoritePrimes(.saveButtonTapped):
+         .favoritePrimes(.saveButtonTapped),
+         .counterView(.primeModal(.onAppear)),
+         .counterView(.primeModal(.setIsPrime(_))):
       break
     case .counterView(.primeModal(.removeFavoritePrimeTapped)):
       state.activityFeed.append(.init(timestamp: Date(), type: .removedFavoritePrime(state.count)))
@@ -103,7 +108,7 @@ func activityFeed(
       }
     }
 
-    return reducer(&state, action)
+    return reducer(&state, action) + [Effect { callback in callback(.favoritePrimes(.saveButtonTapped)) }.debounce(for: 5, id: "save effect")]
   }
 }
 

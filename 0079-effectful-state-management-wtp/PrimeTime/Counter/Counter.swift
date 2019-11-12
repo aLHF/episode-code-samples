@@ -20,11 +20,11 @@ public func counterReducer(state: inout CounterState, action: CounterAction) -> 
   switch action {
   case .decrTapped:
     state.count -= 1
-    return []
+    return [Effect.cancel(id: "nthPrimeButtonTapped")]
 
   case .incrTapped:
     state.count += 1
-    return []
+    return [Effect.cancel(id: "nthPrimeButtonTapped")]
 
   case .nthPrimeButtonTapped:
     state.isNthPrimeButtonDisabled = true
@@ -32,23 +32,7 @@ public func counterReducer(state: inout CounterState, action: CounterAction) -> 
       nthPrime(state.count)
         .map(CounterAction.nthPrimeResponse)
         .receive(on: .main)
-
-
-//      Effect { callback in
-//      nthPrime(count) { prime in
-//        DispatchQueue.main.async {
-//          callback(.nthPrimeResponse(prime))
-//        }
-//      }
-//      var p: Int?
-//      let sema = DispatchSemaphore(value: 0)
-//      nthPrime(count) { prime in
-//        p = prime
-//        sema.signal()
-//      }
-//      sema.wait()
-//      return .nthPrimeResponse(p)
-//    }
+        .cancellable(id: "nthPrimeButtonTapped")
   ]
 
   case let .nthPrimeResponse(prime):
@@ -77,17 +61,20 @@ public struct CounterViewState {
   public var count: Int
   public var favoritePrimes: [Int]
   public var isNthPrimeButtonDisabled: Bool
+  public var isPrime: Bool?
 
   public init(
     alertNthPrime: PrimeAlert?,
     count: Int,
     favoritePrimes: [Int],
-    isNthPrimeButtonDisabled: Bool
+    isNthPrimeButtonDisabled: Bool,
+    isPrime: Bool?
   ) {
     self.alertNthPrime = alertNthPrime
     self.count = count
     self.favoritePrimes = favoritePrimes
     self.isNthPrimeButtonDisabled = isNthPrimeButtonDisabled
+    self.isPrime = isPrime
   }
 
   var counter: CounterState {
@@ -96,8 +83,8 @@ public struct CounterViewState {
   }
 
   var primeModal: PrimeModalState {
-    get { (self.count, self.favoritePrimes) }
-    set { (self.count, self.favoritePrimes) = newValue }
+    get { (self.count, self.favoritePrimes, self.isPrime) }
+    set { (self.count, self.favoritePrimes, self.isPrime) = newValue }
   }
 }
 
@@ -159,7 +146,7 @@ public struct CounterView: View {
       IsPrimeModalView(
         store: self.store
           .view(
-            value: { ($0.count, $0.favoritePrimes) },
+            value: { ($0.count, $0.favoritePrimes, $0.isPrime) },
             action: { .primeModal($0) }
         )
       )
