@@ -1,37 +1,19 @@
 import Combine
 import SwiftUI
 
-public struct Effect<Action> {
-  let run: (@escaping (Action) -> Void) -> Void
-
-  public init(run: @escaping (@escaping (Action) -> Void) -> Void) {
-    self.run = run
-  }
-
-  public func map<NewAction>(_ transform: @escaping (Action) -> NewAction) -> Effect<NewAction> {
-    return Effect<NewAction> { callback in self.run { action in callback(transform(action)) } }
-  }
-
-  public func flatMap<NewAction>(_ transform: @escaping (Action) -> Effect<NewAction> ) -> Effect<NewAction> {
-    return Effect<NewAction> { callback in self.run { action in transform(action).run { callback($0) } } }
-  }
-
-  public func receive(on queue: DispatchQueue) -> Effect<Action> {
-    return Effect<Action> { callback in self.run { value in queue.async { callback(value) } } }
-  }
-
-  static func zip<A, B>(_ ea: Effect<A>, _ eb: Effect<B>) -> Effect<(A, B)> {
-    return Effect<(A, B)> { callback in
-      var a: A?
-      var b: B?
-
-      ea.run { valueA in a = valueA; if let b = b { callback((valueA, b)) } }
-      eb.run { valueB in b = valueB; if let a = a { callback((a, valueB)) } }
-    }
-  }
+struct Parallel<A> {
+  let run: (@escaping (A) -> Void) -> Void
 }
 
+//DispatchQueue.main.async(execute: () -> Void) -> Void
+//UIView.animate(withDuration: TimeInterval, animations: () -> Void) -> Void
+//URLSession.shared.dataTask(with: URL, completionHandler: (Data?, URLResponse?, Error?) -> Void) -> Void
+
+public typealias Effect<Action> = (@escaping (Action) -> Void) -> Void
+
 public typealias Reducer<Value, Action> = (inout Value, Action) -> [Effect<Action>]
+
+//Button.init("Save", action: <#() -> Void#>)
 
 public final class Store<Value, Action>: ObservableObject {
   private let reducer: Reducer<Value, Action>
@@ -45,7 +27,18 @@ public final class Store<Value, Action>: ObservableObject {
 
   public func send(_ action: Action) {
     let effects = self.reducer(&self.value, action)
-    effects.forEach { effect in effect.run(self.send) }
+    effects.forEach { effect in
+      effect(self.send)
+    }
+//    DispatchQueue.global().async {
+//      effects.forEach { effect in
+//        if let action = effect() {
+//          DispatchQueue.main.async {
+//            self.send(action)
+//          }
+//        }
+//      }
+//    }
   }
 
   public func view<LocalValue, LocalAction>(
@@ -64,18 +57,6 @@ public final class Store<Value, Action>: ObservableObject {
       localStore?.value = toLocalValue(newValue)
     }
     return localStore
-  }
-
-  public func presentation<PresentedValue>(
-    _ kp: KeyPath<Value, PresentedValue?>,
-    dismissAction: Action
-  ) -> Binding<Store<PresentedValue, Action>?> {
-    return Binding<Store<PresentedValue, Action>?>(
-      get: { () -> Store<PresentedValue, Action>? in
-        guard let presentedValue = self.value[keyPath: kp] else { return nil }
-        return Store<PresentedValue, Action>(initialValue: presentedValue, reducer: { _, _ in [] })
-    },
-      set: { _ in self.send(dismissAction) })
   }
 }
 
@@ -96,9 +77,10 @@ public func pullback<LocalValue, GlobalValue, LocalAction, GlobalAction>(
   return { globalValue, globalAction in
     guard let localAction = globalAction[keyPath: action] else { return [] }
     let localEffects = reducer(&globalValue[keyPath: value], localAction)
-    return localEffects.map { localEffect -> Effect<GlobalAction> in
-      return Effect<GlobalAction> { callback in
-        localEffect.run { localAction in
+    return localEffects.map { localEffect in
+      { callback in
+//        guard let localAction = localEffect() else { return nil }
+        localEffect { localAction in
           var globalAction = globalAction
           globalAction[keyPath: action] = localAction
           callback(globalAction)
@@ -114,11 +96,11 @@ public func logging<Value, Action>(
   return { value, action in
     let effects = reducer(&value, action)
     let newValue = value
-    return [Effect { _ in
+    return [{ _ in
       print("Action: \(action)")
       print("Value:")
       dump(newValue)
       print("---")
-      }] + effects
+    }] + effects
   }
 }
