@@ -1,6 +1,51 @@
 import ComposableArchitecture
 import SwiftUI
 
+// MARK: - Environment
+struct Environment {
+  var favoritePrimesService = FavoritePrimesService()
+}
+
+var Current = Environment()
+
+extension Environment {
+  static let mock = Environment(favoritePrimesService: .mock)
+}
+
+// MARK: - FavoritePrimesService
+struct FavoritePrimesService {
+  var loadFavoritePrimes = loadFavoritePrimesFunc
+  var saveFavoritePrimes = saveFavoritePrimesFunc
+}
+
+private func loadFavoritePrimesFunc() -> [Int]? {
+  let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
+  let documentsUrl = URL(fileURLWithPath: documentsPath)
+  let favoritePrimesUrl = documentsUrl.appendingPathComponent("favorite-primes.json")
+  guard
+    let data = try? Data(contentsOf: favoritePrimesUrl),
+    let favoritePrimes = try? JSONDecoder().decode([Int].self, from: data)
+    else { return nil }
+
+  return favoritePrimes
+}
+
+private func saveFavoritePrimesFunc(_ favoritePrimes: [Int]) {
+  let data = try! JSONEncoder().encode(favoritePrimes)
+  let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
+  let documentsUrl = URL(fileURLWithPath: documentsPath)
+  let favoritePrimesUrl = documentsUrl.appendingPathComponent("favorite-primes.json")
+  try! data.write(to: favoritePrimesUrl)
+}
+
+extension FavoritePrimesService {
+  static let mock = FavoritePrimesService(
+    loadFavoritePrimes: { return [67, 829, 5701, 12263, 13759] },
+    saveFavoritePrimes: { favoritePrimes in print(favoritePrimes) }
+  )
+}
+// ===
+
 public enum FavoritePrimesAction: Equatable {
   case deleteFavoritePrimes(IndexSet)
   case loadButtonTapped
@@ -36,23 +81,11 @@ public func favoritePrimesReducer(state: inout [Int], action: FavoritePrimesActi
 }
 
 private func saveEffect(favoritePrimes: [Int]) -> Effect<FavoritePrimesAction> {
-  return .fireAndForget {
-    let data = try! JSONEncoder().encode(favoritePrimes)
-    let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
-    let documentsUrl = URL(fileURLWithPath: documentsPath)
-    let favoritePrimesUrl = documentsUrl.appendingPathComponent("favorite-primes.json")
-    try! data.write(to: favoritePrimesUrl)
-  }
+  return .fireAndForget { Current.favoritePrimesService.saveFavoritePrimes(favoritePrimes) }
 }
 
 private let loadEffect = Effect<FavoritePrimesAction?>.sync {
-  let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
-  let documentsUrl = URL(fileURLWithPath: documentsPath)
-  let favoritePrimesUrl = documentsUrl.appendingPathComponent("favorite-primes.json")
-  guard
-    let data = try? Data(contentsOf: favoritePrimesUrl),
-    let favoritePrimes = try? JSONDecoder().decode([Int].self, from: data)
-    else { return nil }
+  guard let favoritePrimes = Current.favoritePrimesService.loadFavoritePrimes() else { return nil }
   return .loadedFavoritePrimes(favoritePrimes)
 }
 

@@ -85,3 +85,5 @@ This repository is the home of code written on episodes of
 1. [The Combine Framework and Effects: Part 1](0080-combine-and-effects-pt1)
 1. [The Combine Framework and Effects: Part 2](0081-combine-and-effects-pt2)
 1. [Effectful State Management: Reducers](0082-testable-state-management-reducers)
+1. [Effectful State Management: Effects](0083-testable-state-management-effects)
+1. [Effectful State Management: Ergonomics](0084-testable-state-management-ergonomics)

@@ -54,7 +54,7 @@ public final class Store<Value, Action>: ObservableObject {
           didComplete = true
           guard let effectCancellable = effectCancellable else { return }
           self?.effectCancellables.remove(effectCancellable)
-      },
+        },
         receiveValue: self.send
       )
       if !didComplete, let effectCancellable = effectCancellable {

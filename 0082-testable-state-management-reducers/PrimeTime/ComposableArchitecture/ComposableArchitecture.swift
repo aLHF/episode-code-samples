@@ -26,6 +26,24 @@ extension Effect {
       Just(work())
     }.eraseToEffect()
   }
+
+  public static func async(work: @escaping ((Output) -> Void) -> Void) -> Effect {
+    return Deferred {
+      return Future<Output, Failure> { callback in
+        work { output in
+          callback(.success(output))
+        }
+      }
+    }.eraseToEffect()
+  }
+
+  public func hush() -> Effect {
+    return self
+      .map(Optional.some)
+      .replaceError(with: nil)
+      .compactMap { $0 }
+      .eraseToEffect()
+  }
 }
 
 extension Publisher where Failure == Never {
@@ -52,12 +70,13 @@ public final class Store<Value, Action>: ObservableObject {
     effects.forEach { effect in
       var effectCancellable: AnyCancellable?
       var didComplete = false
+
       effectCancellable = effect.sink(
         receiveCompletion: { [weak self] _ in
           didComplete = true
           guard let effectCancellable = effectCancellable else { return }
           self?.effectCancellables.remove(effectCancellable)
-      },
+        },
         receiveValue: self.send
       )
       if !didComplete, let effectCancellable = effectCancellable {
