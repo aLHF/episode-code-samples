@@ -16,20 +16,23 @@ class FavoritePrimesTests: XCTestCase {
   }
 
   func testSaveButtonTapped() {
+    var state = [2, 3, 5, 7]
+    let expectedData = try! JSONEncoder().encode(state)
+
     var didSave = false
     Current.fileClient.save = { _, data in
-      .fireAndForget {
+      if data != expectedData { XCTFail() }
+      return .fireAndForget {
         didSave = true
       }
     }
 
-    var state = [2, 3, 5, 7]
     let effects = favoritePrimesReducer(state: &state, action: .saveButtonTapped)
 
     XCTAssertEqual(state, [2, 3, 5, 7])
     XCTAssertEqual(effects.count, 1)
 
-    effects[0].sink { _ in XCTFail() }
+    _ = effects[0].sink { _ in XCTFail() }
 
     XCTAssert(didSave)
   }
@@ -38,6 +41,7 @@ class FavoritePrimesTests: XCTestCase {
     Current.fileClient.load = { _ in .sync { try! JSONEncoder().encode([2, 31]) } }
 
     var state = [2, 3, 5, 7]
+    var hasReceivedValue = false
     var effects = favoritePrimesReducer(state: &state, action: .loadButtonTapped)
 
     XCTAssertEqual(state, [2, 3, 5, 7])
@@ -45,13 +49,15 @@ class FavoritePrimesTests: XCTestCase {
 
     var nextAction: FavoritePrimesAction!
     let receivedCompletion = self.expectation(description: "receivedCompletion")
-    effects[0].sink(
+    _ = effects[0].sink(
       receiveCompletion: { _ in
         receivedCompletion.fulfill()
     },
       receiveValue: { action in
+        if hasReceivedValue { XCTFail() }
         XCTAssertEqual(action, .loadedFavoritePrimes([2, 31]))
         nextAction = action
+        hasReceivedValue = true
     })
     self.wait(for: [receivedCompletion], timeout: 0)
 

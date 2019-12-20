@@ -34,21 +34,23 @@ extension Publisher where Failure == Never {
   }
 }
 
-public typealias Reducer<Value, Action> = (inout Value, Action) -> [Effect<Action>]
+public typealias Reducer<Value, Action, Environment> = (inout Value, Action, Environment) -> [Effect<Action>]
 
-public final class Store<Value, Action>: ObservableObject {
-  private let reducer: Reducer<Value, Action>
+public final class Store<Value, Action, Environment>: ObservableObject {
+  private let reducer: Reducer<Value, Action, Environment>
   @Published public private(set) var value: Value
+  private let environment: Environment
   private var viewCancellable: Cancellable?
   private var effectCancellables: Set<AnyCancellable> = []
 
-  public init(initialValue: Value, reducer: @escaping Reducer<Value, Action>) {
+  public init(initialValue: Value, environment: Environment, reducer: @escaping Reducer<Value, Action, Environment>) {
     self.reducer = reducer
     self.value = initialValue
+    self.environment = environment
   }
 
   public func send(_ action: Action) {
-    let effects = self.reducer(&self.value, action)
+    let effects = self.reducer(&self.value, action, environment)
     effects.forEach { effect in
       var effectCancellable: AnyCancellable?
       var didComplete = false
@@ -66,14 +68,15 @@ public final class Store<Value, Action>: ObservableObject {
     }
   }
 
-  public func view<LocalValue, LocalAction>(
+  public func view<LocalValue, LocalAction, LocalEnvironment>(
     value toLocalValue: @escaping (Value) -> LocalValue,
-    action toGlobalAction: @escaping (LocalAction) -> Action
-  ) -> Store<LocalValue, LocalAction> {
-    let localStore = Store<LocalValue, LocalAction>(
-      initialValue: toLocalValue(self.value),
-      reducer: { localValue, localAction in
-        self.send(toGlobalAction(localAction))
+    action toGlobalAction: @escaping (LocalAction) -> Action,
+    environment toLocalEnvironment: @escaping (Environment) -> LocalEnvironment
+  ) -> Store<LocalValue, LocalAction, LocalEnvironment> {
+    let localStore = Store<LocalValue, LocalAction, LocalEnvironment>(
+      initialValue: toLocalValue(self.value), environment: toLocalEnvironment(environment),
+      reducer: { localValue, localAction, localEnvironment in
+        self.send(toGlobalAction(localAction)) // TODO: Do we need to send an environment
         localValue = toLocalValue(self.value)
         return []
     }
@@ -87,9 +90,9 @@ public final class Store<Value, Action>: ObservableObject {
 
 public func combine<Value, Action>(
   _ reducers: Reducer<Value, Action>...
-) -> Reducer<Value, Action> {
-  return { value, action in
-    let effects = reducers.flatMap { $0(&value, action) }
+) -> Reducer<Value, Action, Environment> {
+  return { value, action, environment in
+    let effects = reducers.flatMap { $0(&value, action, environment) }
     return effects
   }
 }
